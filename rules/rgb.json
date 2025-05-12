@@ -1,0 +1,18 @@
+{
+  "states": [0, 1,2,3],
+  "default_state": 0,
+  "neighborhood": [
+    [0,0],[-1, -1], [-1, 0], [-1, 1],
+    [ 0, -1],          [ 0, 1],
+    [ 1, -1], [ 1, 0], [ 1, 1]
+  ],
+  "rule_mode": "dll",
+  "rule_dll_path": "plugins/life",
+  "rule_function_name": "update",
+  "state_color_map": {
+    "0": [255,255,255],
+    "1": [255,0,0],
+	"2": [255,0,0],
+	"3": [255,0,0]
+  }
+}
