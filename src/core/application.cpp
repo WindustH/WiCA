@@ -81,7 +81,7 @@ bool Application::initializeSubsystems(const std::string& configPath) {
     if (!config_.loadFromFile(currentConfigPath_)) {
         ErrorHandler::logError("Application: CRITICAL - Failed to load configuration file: " + currentConfigPath_ + ". Using fallbacks.", true);
         // Attempt to initialize with some defaults if config load fails
-        config_ = Config(); // Create a default/empty config
+        config_ = Rule(); // Create a default/empty config
     } else {
         postMessageToUser("Config loaded: " + currentConfigPath_.substr(currentConfigPath_.find_last_of("/\\") + 1));
     }
@@ -189,7 +189,7 @@ void Application::loadConfiguration(const std::string& configPath) {
 
     postMessageToUser("Loading new configuration: " + configPath + "...", 0, false);
 
-    Config newConfig;
+    Rule newConfig;
     if (!newConfig.loadFromFile(configPath)) {
         ErrorHandler::logError("Application::loadConfiguration - CRITICAL - Failed to load new configuration file: " + configPath, true);
         postMessageToUser("Error: Failed to load config: " + configPath.substr(configPath.find_last_of("/\\") + 1), 5000);

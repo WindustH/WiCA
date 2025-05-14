@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
-#include "../core/config.h" // Required for Config
+#include "../core/rule.h" // Required for Config
 #include "../ca/cell_space.h"
 #include "viewport.h"
 #include "../utils/color.h"
@@ -59,12 +59,12 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    bool initialize(SDL_Window* window, const Config& config);
+    bool initialize(SDL_Window* window, const Rule& config);
     /**
      * @brief Reinitializes the color map from a new configuration.
      * @param newConfig The new configuration object.
      */
-    void reinitializeColors(const Config& newConfig);
+    void reinitializeColors(const Rule& newConfig);
 
     void renderGrid(const CellSpace& cellSpace, const Viewport& viewport);
     void renderUI(const std::string& commandText, bool showCommandInput,

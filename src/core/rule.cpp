@@ -1,4 +1,4 @@
-#include "config.h"
+#include "rule.h"
 #include "../utils/error_handler.h"
 #include <fstream>
 #include <stdexcept>
@@ -6,14 +6,14 @@
 
 using json = nlohmann::json;
 
-Config::Config()
+Rule::Rule()
     : defaultState_(0),
       loadedSuccessfully_(false),
       ruleMode_("trie") // Default to Trie-based rules
 {
 }
 
-bool Config::loadFromFile(const std::string& filePath) {
+bool Rule::loadFromFile(const std::string& filePath) {
     loadedSuccessfully_ = false;
 
     std::ifstream configFileStream(filePath);
@@ -44,11 +44,11 @@ bool Config::loadFromFile(const std::string& filePath) {
     return true;
 }
 
-bool Config::isLoaded() const {
+bool Rule::isLoaded() const {
     return loadedSuccessfully_;
 }
 
-bool Config::parseStates(const json& j) {
+bool Rule::parseStates(const json& j) {
     try {
         if (!j.contains("states") || !j["states"].is_array()) {
             ErrorHandler::logError("Config: 'states' field is missing or not an array.");
@@ -66,7 +66,7 @@ bool Config::parseStates(const json& j) {
     return true;
 }
 
-bool Config::parseDefaultState(const json& j) {
+bool Rule::parseDefaultState(const json& j) {
     try {
         if (!j.contains("default_state") || !j["default_state"].is_number_integer()) {
             ErrorHandler::logError("Config: 'default_state' field is missing or not an integer.");
@@ -95,7 +95,7 @@ bool Config::parseDefaultState(const json& j) {
     return true;
 }
 
-bool Config::parseNeighborhood(const json& j) {
+bool Rule::parseNeighborhood(const json& j) {
     try {
         if (!j.contains("neighborhood") || !j["neighborhood"].is_array()) {
             ErrorHandler::logError("Config: 'neighborhood' field is missing or not an array. This is required for both Trie and DLL (for neighbor count) modes.");
@@ -119,7 +119,7 @@ bool Config::parseNeighborhood(const json& j) {
     return true;
 }
 
-bool Config::parseRuleSettings(const json& j) {
+bool Rule::parseRuleSettings(const json& j) {
     // Reset member variables related to rules before parsing
     ruleMode_ = "trie"; // Default to trie
     rules_.clear();
@@ -225,120 +225,150 @@ bool Config::parseRuleSettings(const json& j) {
     // return false;
 }
 
-bool Config::parseStateColorMap(const json& j) {
+// Helper function for default color assignment (to avoid repetition)
+void assignDefaultColors(std::map<int, Color>& mapToFill, const std::vector<int>& states) {
+    mapToFill.clear(); // Ensure we start fresh
+    ErrorHandler::logError("Config: Assigning default colors for states.", false); // Informative message
+    for (int s : states) {
+        // Using the specific default logic from your original "missing field" handling
+        if (s == 0) {
+            mapToFill[s] = Color(220, 220, 220, 255); // Default for state 0
+        } else if (s == 1) {
+            mapToFill[s] = Color(30, 30, 30, 255);    // Default for state 1
+        } else {
+            // Calculated debug color for other states
+            mapToFill[s] = Color( (s * 30) % 256, (s * 50) % 256, (s * 70) % 256, 255);
+        }
+    }
+}
+
+bool Rule::parseStateColorMap(const nlohmann::json& j) {
     try {
-        stateColorMap_.clear();
+        stateColorMap_.clear(); // Start with an empty map
+        bool format_valid = true; // Assume format is valid initially
+
         if (!j.contains("state_color_map")) {
-            ErrorHandler::logError("Config: 'state_color_map' field is missing. Assigning default colors.", false);
+            ErrorHandler::logError("Config: 'state_color_map' field is missing.", false);
+            format_valid = false;
+        } else {
+            const auto& color_map_json = j["state_color_map"];
+
+            if (!color_map_json.is_array()) {
+                ErrorHandler::logError("Config: 'state_color_map' field is not a JSON array.", false);
+                format_valid = false;
+            } else {
+                // It's an array, now validate its contents
+                for (size_t i = 0; i < color_map_json.size(); ++i) {
+                    const auto& color_array_json = color_map_json[i];
+                    int current_state = static_cast<int>(i); // State ID is the index
+
+                    // Check 1: Is the element itself an array?
+                    if (!color_array_json.is_array()) {
+                        ErrorHandler::logError("Config: Element at index " + std::to_string(i) + " in 'state_color_map' is not a color array.", false);
+                        format_valid = false;
+                        break; // Stop processing this array on first error
+                    }
+
+                    // Check 2: Is the color array size valid (3 or 4)?
+                    if (color_array_json.size() < 3 || color_array_json.size() > 4) {
+                        ErrorHandler::logError("Config: Color array for state " + std::to_string(current_state) +
+                                               " has invalid size (" + std::to_string(color_array_json.size()) + "). Must be 3 (RGB) or 4 (RGBA).", false);
+                        format_valid = false;
+                        break; // Stop processing
+                    }
+
+                    // Check 3: Are the components valid integers (0-255)?
+                    std::vector<unsigned char> c_vals;
+                    bool components_valid = true;
+                    for(const auto& comp : color_array_json) {
+                        if (!comp.is_number_integer() || comp.get<int>() < 0 || comp.get<int>() > 255) {
+                             ErrorHandler::logError("Config: Invalid color component found for state " + std::to_string(current_state) +
+                                                    ". Components must be integers between 0-255.", false);
+                             components_valid = false;
+                             format_valid = false;
+                             break; // Stop processing components for this color
+                        }
+                        c_vals.push_back(static_cast<unsigned char>(comp.get<int>()));
+                    }
+
+                    if (!components_valid) {
+                        break; // Stop processing the outer array
+                    }
+
+                    // If all checks passed for this color array, store it
+                    unsigned char alpha = (c_vals.size() == 4) ? c_vals[3] : 255;
+                    stateColorMap_[current_state] = Color(c_vals[0], c_vals[1], c_vals[2], alpha);
+                }
+            }
+        }
+
+        // --- Decision Point ---
+        if (!format_valid) {
+            // If the format was invalid at any point, discard partial results and use defaults
+            assignDefaultColors(stateColorMap_, states_);
+        } else {
+            // Format was valid, but the array might not cover all states defined in `states_`
+            // Assign debug colors for any remaining states from the `states_` list
             for (int s : states_) {
                 if (stateColorMap_.find(s) == stateColorMap_.end()) {
-                    if (s == 0) stateColorMap_[s] = Color(220, 220, 220, 255);
-                    else if (s == 1) stateColorMap_[s] = Color(30, 30, 30, 255);
-                    else stateColorMap_[s] = Color( (s * 30) % 256, (s * 50) % 256, (s * 70) % 256, 255);
+                    ErrorHandler::logError("Config: State " + std::to_string(s) + " defined in 'states' but not covered by 'state_color_map' array. Assigning debug color.", false);
+                     // Use the calculated debug color part of the default logic
+                     stateColorMap_[s] = Color( (s * 30) % 256, (s * 50) % 256, (s * 70) % 256, 255);
                 }
-            }
-            return true;
-        }
-
-        const auto& color_map_json = j["state_color_map"];
-
-        if (color_map_json.is_object()) {
-            for (auto it = color_map_json.items().begin(); it != color_map_json.items().end(); ++it) {
-                int state_key;
-                try {
-                    state_key = std::stoi(it.key());
-                } catch (const std::invalid_argument& ia) {
-                    ErrorHandler::logError("Config: Invalid state key in 'state_color_map' object. Must be an integer string: " + it.key());
-                    return false;
-                }
-                 if (!it.value().is_array() || it.value().size() < 3 || it.value().size() > 4) {
-                    ErrorHandler::logError("Config: Invalid color value for state " + std::to_string(state_key) +
-                                           ". Must be an array of 3 (RGB) or 4 (RGBA) integers.");
-                    return false;
-                }
-                std::vector<unsigned char> c_vals;
-                for(const auto& comp : it.value()){
-                    if(!comp.is_number_integer() || comp.get<int>() < 0 || comp.get<int>() > 255){
-                        ErrorHandler::logError("Config: Invalid color component for state " + std::to_string(state_key) + ". Must be int 0-255.");
-                        return false;
-                    }
-                    c_vals.push_back(static_cast<unsigned char>(comp.get<int>()));
-                }
-                unsigned char alpha = (c_vals.size() == 4) ? c_vals[3] : 255;
-                stateColorMap_[state_key] = Color(c_vals[0], c_vals[1], c_vals[2], alpha);
-            }
-        } else if (color_map_json.is_array()) {
-            for(const auto& item : color_map_json){
-                if (!item.is_object() || !item.contains("state") || !item["state"].is_number_integer() ||
-                    !item.contains("color") || !item["color"].is_array() || item["color"].size() < 3 || item["color"].size() > 4) {
-                    ErrorHandler::logError("Config: Invalid 'state_color_map' array entry. Expecting {\"state\": int, \"color\": [r,g,b,a?]}");
-                    return false;
-                }
-                int state = item["state"].get<int>();
-                std::vector<unsigned char> c_vals;
-                 for(const auto& comp : item["color"]){
-                    if(!comp.is_number_integer() || comp.get<int>() < 0 || comp.get<int>() > 255){
-                         ErrorHandler::logError("Config: Invalid color component in 'state_color_map'. Must be int 0-255.");
-                         return false;
-                    }
-                    c_vals.push_back(static_cast<unsigned char>(comp.get<int>()));
-                }
-                unsigned char alpha = (c_vals.size() == 4) ? c_vals[3] : 255;
-                stateColorMap_[state] = Color(c_vals[0], c_vals[1], c_vals[2], alpha);
-            }
-        } else {
-            ErrorHandler::logError("Config: 'state_color_map' field is not a valid object or array.");
-            return false;
-        }
-
-        for (int s : states_) {
-            if (stateColorMap_.find(s) == stateColorMap_.end()) {
-                ErrorHandler::logError("Config: State " + std::to_string(s) + " defined in 'states' has no color. Assigning debug color.", false);
-                stateColorMap_[s] = Color( (s * 30) % 256, (s * 50) % 256, (s * 70) % 256, 255);
             }
         }
 
-    } catch (const json::exception& e) {
-        ErrorHandler::logError("Config: Error parsing 'state_color_map': " + std::string(e.what()));
-        return false;
+    } catch (const nlohmann::json::exception& e) {
+        // Catch potential errors during JSON access/parsing (e.g., malformed JSON file)
+        ErrorHandler::logError("Config: JSON parsing error while accessing 'state_color_map': " + std::string(e.what()));
+        // Assign default colors as a safe fallback even for JSON errors
+        assignDefaultColors(stateColorMap_, states_);
+        // Return true because we handled it with defaults, or return false if this should be fatal
+        return true; // Or consider false if a json exception should halt config loading
+    } catch (const std::exception& e) {
+        // Catch other potential standard exceptions
+         ErrorHandler::logError("Config: Standard error during 'state_color_map' processing: " + std::string(e.what()));
+         assignDefaultColors(stateColorMap_, states_);
+         return true; // Or false
     }
-    return true;
+
+    return true; // Parsing completed (either successfully via JSON or using defaults)
 }
 
 
-const std::vector<int>& Config::getStates() const {
+const std::vector<int>& Rule::getStates() const {
     return states_;
 }
 
-int Config::getDefaultState() const {
+int Rule::getDefaultState() const {
     return defaultState_;
 }
 
-const std::vector<Point>& Config::getNeighborhood() const {
+const std::vector<Point>& Rule::getNeighborhood() const {
     return neighborhood_;
 }
 
-const std::string& Config::getRuleMode() const {
+const std::string& Rule::getRuleMode() const {
     return ruleMode_;
 }
 
-const std::vector<std::vector<int>>& Config::getStateUpdateRules() const {
+const std::vector<std::vector<int>>& Rule::getStateUpdateRules() const {
     return rules_;
 }
 
-const std::string& Config::getRuleDllPath() const {
+const std::string& Rule::getRuleDllPath() const {
     return ruleDllPath_;
 }
 
-const std::string& Config::getRuleFunctionName() const {
+const std::string& Rule::getRuleFunctionName() const {
     return ruleFunctionName_;
 }
 
-const std::map<int, Color>& Config::getStateColorMap() const {
+const std::map<int, Color>& Rule::getStateColorMap() const {
     return stateColorMap_;
 }
 
-Color Config::getColorForState(int state) const {
+Color Rule::getColorForState(int state) const {
     auto it = stateColorMap_.find(state);
     if (it != stateColorMap_.end()) {
         return it->second;

@@ -9,8 +9,8 @@
   "rule_mode": "dll",
   "rule_dll_path": "plugins/life",
   "rule_function_name": "update",
-  "state_color_map": {
-    "0": [220, 220, 220, 255],
-    "1": [30, 30, 30, 255]
-  }
+  "state_color_map": [
+    [220, 220, 220, 255],
+    [30, 30, 30, 255]
+  ]
 }

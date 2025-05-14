@@ -134,7 +134,7 @@ void RuleEngine::unloadRuleLibrary() {
 
 // --- Main Methods ---
 
-bool RuleEngine::initialize(const Config& config) {
+bool RuleEngine::initialize(const Rule& config) {
     ErrorHandler::logError("RuleEngine: Initializing...", false);
     initialized_ = false;
     unloadRuleLibrary(); // Ensure any previous DLL is unloaded before setting new mode/rules

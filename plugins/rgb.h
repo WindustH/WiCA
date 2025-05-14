@@ -1,5 +1,5 @@
-#ifndef LIFE_PLUGIN_H
-#define LIFE_PLUGIN_H
+#ifndef RGB_PLUGIN_H
+#define RGB_PLUGIN_H
 
 // Standard C/C++ headers can be included if needed
 // For example, <vector>, <numeric>, etc.
@@ -8,13 +8,13 @@
 // This ensures the function is correctly exported on Windows
 // and has default visibility on POSIX systems.
 #ifdef _WIN32
-    #ifdef LIFE_PLUGIN_EXPORTS // This should be defined by the DLL project
-        #define LIFE_PLUGIN_API __declspec(dllexport)
+    #ifdef RGB_PLUGIN_EXPORTS // This should be defined by the DLL project
+        #define RGB_PLUGIN_API __declspec(dllexport)
     #else
-        #define LIFE_PLUGIN_API __declspec(dllimport) // For executables linking against it (not used here)
+        #define RGB_PLUGIN_API __declspec(dllimport) // For executables linking against it (not used here)
     #endif
 #else // GCC/Clang on Linux/macOS
-    #define LIFE_PLUGIN_API __attribute__((visibility("default")))
+    #define RGB_PLUGIN_API __attribute__((visibility("default")))
 #endif
 
 /**
@@ -31,6 +31,6 @@
  * @param neighborCount The number of neighbors (typically 8 for Moore neighborhood).
  * @return The new state for the cell (0 or 1).
  */
-extern "C" LIFE_PLUGIN_API int update(const int* neighborStates);
+extern "C" RGB_PLUGIN_API int update(const int* neighborStates);
 
-#endif // LIFE_PLUGIN_H
+#endif // RGB_PLUGIN_H

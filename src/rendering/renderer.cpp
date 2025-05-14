@@ -139,7 +139,7 @@ bool Renderer::loadDefaultFont(int fontSize) {
     return false;
 }
 
-void Renderer::reinitializeColors(const Config& newConfig) {
+void Renderer::reinitializeColors(const Rule& newConfig) {
     stateSdlColorMap_.clear();
     std::cout << "[DEBUG] Renderer::reinitializeColors - Color map cleared." << std::endl;
     if (!newConfig.isLoaded()) {
@@ -166,7 +166,7 @@ void Renderer::reinitializeColors(const Config& newConfig) {
 }
 
 
-bool Renderer::initialize(SDL_Window* window, const Config& config) {
+bool Renderer::initialize(SDL_Window* window, const Rule& config) {
     std::cout << "[DEBUG] Renderer::initialize()" << std::endl;
     if (!window) {
         ErrorHandler::logError("Renderer: Provided window is null.");

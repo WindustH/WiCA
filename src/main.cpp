@@ -10,7 +10,7 @@
 int main(int argc, char* argv[]) {
 
     // Basic command line argument parsing (optional)
-    std::string configFilePath = "rules/life_dll.json"; // Default config path
+    std::string configFilePath = "rules/rgb.json"; // Default config path
     if (argc > 1) {
         // Example: Allow specifying a config file as the first argument
         // For more complex args, use a library like cxxopts or getopt

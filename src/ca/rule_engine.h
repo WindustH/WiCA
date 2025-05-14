@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <map>
-#include "../core/config.h" // Needs Config to get rules, neighborhood, etc.
+#include "../core/rule.h" // Needs Config to get rules, neighborhood, etc.
 #include "../utils/trie.h"   // The Trie for rule lookup
 #include "cell_space.h"     // Needs CellSpace to get cell states
 #include "../utils/point.h" // For Point
@@ -57,7 +57,7 @@ public:
      * @param config A constant reference to the Config object.
      * @return True if initialization was successful, false otherwise.
      */
-    bool initialize(const Config& config);
+    bool initialize(const Rule& config);
 
     /**
      * @brief Calculates the next generation of cell states based on the current mode.

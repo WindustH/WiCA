@@ -5,7 +5,7 @@
 #include <vector>
 #include <SDL.h>
 
-#include "config.h"
+#include "rule.h"
 #include "../ca/cell_space.h"
 #include "../ca/rule_engine.h"
 #include "../rendering/renderer.h"
@@ -31,7 +31,7 @@ private:
     SDL_Window* window_;
     SDL_GLContext glContext_;
 
-    Config config_; // Current configuration
+    Rule config_; // Current configuration
     std::string currentConfigPath_; // Path to the current configuration file
 
     InputHandler inputHandler_;

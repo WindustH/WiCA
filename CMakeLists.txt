@@ -43,7 +43,7 @@ set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(PROJECT_SOURCES
     ${PROJECT_ROOT}/src/main.cpp
     ${PROJECT_ROOT}/src/core/application.cpp
-    ${PROJECT_ROOT}/src/core/config.cpp
+    ${PROJECT_ROOT}/src/core/rule.cpp
     ${PROJECT_ROOT}/src/ca/cell_space.cpp
     ${PROJECT_ROOT}/src/ca/rule_engine.cpp
     ${PROJECT_ROOT}/src/rendering/renderer.cpp
@@ -162,7 +162,7 @@ if(EXISTS ${RULES_SOURCE_DIR})
     # to the destination rules directory.
     add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${RULES_SOURCE_DIR}/ ${RULES_DEST_DIR}/ # Note the trailing slashes
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${RULES_SOURCE_DIR}/ ${RULES_DEST_DIR}/ # Note the trailing slashes
         COMMENT "Copying base rules directory to build directory"
     )
 else()

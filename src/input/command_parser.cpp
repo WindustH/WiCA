@@ -109,12 +109,12 @@ bool CommandParser::parseAndExecute(const std::string& commandString,
             application_.postMessageToUser("Usage: load <filename>");
         }
         return true;
-    } else if (command == "load-config") { // New command
+    } else if (command == "load-rule") { // New command
         if (tokens.size() >= 2) {
             std::string configPath = joinTokens(tokens, 1, tokens.size());
             application_.loadConfiguration(configPath);
         } else {
-            application_.postMessageToUser("Usage: load-config <filepath>");
+            application_.postMessageToUser("Usage: load-rule <filepath>");
         }
         return true;
     }else if (command == "brush-state") {

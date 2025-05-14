@@ -1,37 +1,55 @@
 #include "rgb.h"
-// No other project-specific headers should be needed here if the function is self-contained.
-// If you need Point or other utilities, you'd have to reconsider the DLL's dependencies
-// or pass all necessary data through the function arguments.
-// For simplicity, this example is self-contained.
+const int GROWTH_THRESHOLD = 3;
+const int CONSUMPTION_THRESHOLD = 3;
+const int SUPPORT_THRESHOLD = 2;
+extern "C" RGB_PLUGIN_API int update(const int* neighborStates) {
+    int currentState = neighborStates[4];
+    int nextState = currentState;
+    int countR = 0;
+    int countG = 0;
+    int countB = 0;
 
-// Define LIFE_PLUGIN_EXPORTS when building this DLL
-// This is usually done in the CMakeLists.txt for the DLL target.
-
-extern "C" LIFE_PLUGIN_API int update(const int* neighborStates) {
-    // Count live neighbors
-    int liveNeighbors = 0;
-    if (neighborStates != nullptr) { // Ensure neighborStates is not null before iterating
-        for (int i = 0; i < 8; ++i) {
-            if (neighborStates[i] == 1) { // Assuming state 1 is "alive"
-                liveNeighbors++;
-            }
+    for (int i = 0; i < 9; ++i) {
+        if (i == 4) {
+            continue;
+        }
+        if (neighborStates[i] == 1) {
+            countR++;
+        } else if (neighborStates[i] == 2) {
+            countG++;
+        } else if (neighborStates[i] == 3) {
+            countB++;
         }
     }
-
-    // Apply Conway's Game of Life rules
-    if (neighborStates[8] == 1) { // Cell is currently alive
-        if (liveNeighbors < 2) {
-            return 0; // Dies from underpopulation
-        } else if (liveNeighbors == 2 || liveNeighbors == 3) {
-            return 1; // Lives on
-        } else { // liveNeighbors > 3
-            return 0; // Dies from overpopulation
+    if (currentState == 0) {
+        if (countR >= GROWTH_THRESHOLD && countR > countG && countR > countB) {
+            nextState = 1;
+        } else if (countG >= GROWTH_THRESHOLD && countG > countR && countG > countB) {
+            nextState = 2;
+        } else if (countB >= GROWTH_THRESHOLD && countB > countR && countB > countG) {
+            nextState = 3;
         }
-    } else { // Cell is currently dead (state 0)
-        if (liveNeighbors == 3) {
-            return 1; // Becomes alive (reproduction)
-        } else {
-            return 0; // Stays dead
+    } else if (currentState == 1) {
+        if (countG >= CONSUMPTION_THRESHOLD) {
+            nextState = 2;
+        }
+        else if (countR < SUPPORT_THRESHOLD) {
+            nextState = 0;
+        }
+    } else if (currentState == 2) {
+        if (countB >= CONSUMPTION_THRESHOLD) {
+            nextState = 3;
+        }
+        else if (countG < SUPPORT_THRESHOLD) {
+            nextState = 0;
+        }
+    } else if (currentState == 3) {
+        if (countR >= CONSUMPTION_THRESHOLD) {
+            nextState = 1;
+        }
+        else if (countB < SUPPORT_THRESHOLD) {
+            nextState = 0;
         }
     }
+    return nextState;
 }

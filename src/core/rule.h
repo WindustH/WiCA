@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef RULE_H
+#define RULE_H
 
 #include <string>
 #include <vector>
@@ -19,7 +19,7 @@
  * including states, default state, neighborhood definition, update rules
  * (either Trie-based or via external DLL), and state-color mappings.
  */
-class Config {
+class Rule {
 private:
     // --- Configuration Parameters ---
     std::vector<int> states_;                     // List of all possible cell states.
@@ -50,7 +50,7 @@ public:
     /**
      * @brief Default constructor. Initializes with empty/default values.
      */
-    Config();
+    Rule();
 
     /**
      * @brief Loads the CA configuration from a specified JSON file.
