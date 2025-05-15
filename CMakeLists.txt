@@ -169,6 +169,14 @@ else()
     message(WARNING "Rules source directory not found at ${RULES_SOURCE_DIR}")
 endif()
 
+add_custom_target(copy_rules ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${RULES_DEST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${RULES_SOURCE_DIR}/ ${RULES_DEST_DIR}/
+    COMMENT "Copying rules to build directory"
+)
+
+add_dependencies(${PROJECT_NAME} copy_rules)
+
 message(STATUS "Project Root: ${PROJECT_ROOT}")
 message(STATUS "Build Directory: ${CMAKE_BINARY_DIR}")
 message(STATUS "Plugin Output Directory: ${PLUGIN_OUTPUT_DIR}")

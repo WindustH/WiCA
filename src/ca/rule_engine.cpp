@@ -224,19 +224,12 @@ std::vector<std::pair<Point, int>> RuleEngine::calculateNextGeneration(const Cel
 
     for (const Point& cellCoord : cellsToEvaluate) {
         int currentCellState = currentCellSpace.getCellState(cellCoord);
-        // Get states of neighbors based on the neighborhood definition from the config.
-        // For default_rules.json, this will be a 9-element vector (8 neighbors + self).
-        // For life_dll.json, this will be an 8-element vector (Moore neighbors).
         std::vector<int> neighborStatesPattern = currentCellSpace.getNeighborStates(cellCoord, neighborhoodDefinition_);
 
         int nextState = currentCellState; // Default to no change
 
         if (currentRuleMode_ == "dll") {
             if (dllRuleFunction_) {
-                // The DLL function (e.g., update_game_of_life) expects neighbor states and their count.
-                // It's crucial that the DLL function is compatible with the neighborhoodDefinition_
-                // used to generate neighborStatesPattern.
-                // For life_dll.json (8 neighbors), neighborStatesPattern.size() will be 8.
                 const int* ns_data = neighborStatesPattern.empty() ? nullptr : neighborStatesPattern.data();
                 nextState = dllRuleFunction_(ns_data);
             } else {
@@ -244,20 +237,14 @@ std::vector<std::pair<Point, int>> RuleEngine::calculateNextGeneration(const Cel
                 // nextState remains currentCellState
             }
         } else if (currentRuleMode_ == "trie") {
-            // The key for the Trie is the neighborStatesPattern, which includes the center cell's
-            // state if [0,0] is in neighborhoodDefinition_ (as in default_rules.json).
             int nextStateFromRule = ruleTrie_.findNextState(neighborStatesPattern);
 
             if (nextStateFromRule != NO_RULE_FOUND) {
-                nextState = nextStateFromRule; // Rule explicitly defines the next state
+                nextState = nextStateFromRule;
             } else {
-                // NO_RULE_FOUND: For a GOL ruleset like default_rules.json that ONLY defines
-                // transitions TO the active state (1), any pattern not found should
-                // result in the cell becoming/staying in the default (dead) state (0).
                 nextState = currentCellState;
             }
         }
-        // Else: unknown mode, nextState remains currentCellState (no change)
 
         if (nextState != currentCellState) {
             cellsToUpdate.emplace_back(cellCoord, nextState);

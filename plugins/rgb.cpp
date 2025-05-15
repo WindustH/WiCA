@@ -19,6 +19,8 @@ extern "C" RGB_PLUGIN_API int update(const int* neighborStates) {
             countG++;
         } else if (neighborStates[i] == 3) {
             countB++;
+        } else if (neighborStates[i] == 4) {
+            if(currentState!=4) return 0;
         }
     }
     if (currentState == 0) {
