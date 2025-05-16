@@ -1,6 +1,5 @@
 #include "utils/logger.h"        // Your new logging system
 #include "core/application.h"    // Your main application class
-#include "utils/error_handler.h" // Still used for some SDL and fatal error handling
 
 #include <iostream> // Used for emergency output if logger initialization fails
 #include <string>
@@ -58,8 +57,6 @@ int main(int argc, char* argv[]) {
         main_logger->critical("Application instance was not created. Cannot run.");
     }
 
-    // spdlog will automatically flush and clean up registered loggers on program exit,
-    // but calling spdlog::shutdown() explicitly is a good practice, especially after app->run()
     spdlog::shutdown();
 
     return 0;

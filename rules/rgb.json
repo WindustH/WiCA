@@ -6,7 +6,6 @@
     [ 0, -1], [ 0, 0], [ 0, 1],
     [ 1, -1], [ 1, 0], [ 1, 1]
   ],
-  "rule_mode": "dll",
   "rule_dll_path": "plugins/rgb",
   "rule_function_name": "update",
   "state_color_map": [

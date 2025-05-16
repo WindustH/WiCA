@@ -28,9 +28,6 @@ private:
 
     bool loadedSuccessfully_;                     // Flag to indicate if configuration was loaded without errors.
 
-    // Rule definition mode
-    std::string ruleMode_; // "trie" or "dll"
-
     // For Trie-based rules
     std::vector<std::vector<int>> rules_;         // List of state update rules. Each inner vector is [N1, N2,..., Nk, NextState].
 
@@ -74,7 +71,6 @@ public:
     int getDefaultState() const;
     const std::vector<Point>& getNeighborhood() const;
 
-    const std::string& getRuleMode() const;
     const std::vector<std::vector<int>>& getStateUpdateRules() const; // For Trie mode
     const std::string& getRuleDllPath() const;                     // For DLL mode
     const std::string& getRuleFunctionName() const;                // For DLL mode

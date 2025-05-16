@@ -8,7 +8,6 @@
 RuleEngine::RuleEngine()
     : dllHandle_(nullptr),
       dllRuleFunction_(nullptr),
-      currentRuleMode_("trie"), // Default to trie
       defaultState_(0),
       initialized_(false) {
 }
@@ -142,40 +141,13 @@ bool RuleEngine::initialize(const Rule& config) {
         return false;
     }
 
-    currentRuleMode_ = config.getRuleMode();
     neighborhood_ = config.getNeighborhood();
     defaultState_ = config.getDefaultState();
 
-
-    if (currentRuleMode_ == "dll") {
-        std::string dllPathFromConfig = config.getRuleDllPath();
-        std::string funcName = config.getRuleFunctionName();
-        if (!loadRuleLibrary(dllPathFromConfig, funcName)) {
-            if (logger) logger->error("Failed to initialize in DLL mode. DLL or function not loaded.");
-            return false;
-        }
-        ruleTrie_ = Trie();
-    } else if (currentRuleMode_ == "trie") {
-        ruleTrie_ = Trie();
-        const auto& rules = config.getStateUpdateRules();
-        if (neighborhood_.empty() && !rules.empty()) {
-            if (logger) logger->error("Trie mode - Neighborhood is empty, but rules are defined. This may lead to incorrect behavior.");
-        }
-        unsigned int rulesLoadedCount = 0;
-        for (const auto& ruleVector : rules) {
-            if (ruleVector.empty()) {
-                continue;
-            }
-            if (ruleVector.size() != (neighborhood_.size() + 1) ) {
-                continue;
-            }
-            std::vector<int> rulePrefix(ruleVector.begin(), ruleVector.end() - 1);
-            int resultState = ruleVector.back();
-            ruleTrie_.insertRule(rulePrefix, resultState);
-            rulesLoadedCount++;
-        }
-    } else {
-        if (logger) logger->error("Unknown rule mode: '" + currentRuleMode_ + "'. Cannot initialize rules.");
+    std::string dllPathFromConfig = config.getRuleDllPath();
+    std::string funcName = config.getRuleFunctionName();
+    if (!loadRuleLibrary(dllPathFromConfig, funcName)) {
+        if (logger) logger->error("Failed to initialize in DLL mode. DLL or function not loaded.");
         return false;
     }
 
@@ -201,19 +173,11 @@ std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& c
 
         int nextState = currentCellState;
 
-        if (currentRuleMode_ == "dll") {
-            if (dllRuleFunction_) {
-                const int* ns_data = neighborStatesPattern.empty() ? nullptr : neighborStatesPattern.data();
-                nextState = dllRuleFunction_(ns_data);
-            } else {
-                if (logger) logger->error("DLL function pointer is null in calculateNextGeneration. Cell state will persist.");
-            }
-        } else if (currentRuleMode_ == "trie") {
-            int nextStateFromRule = ruleTrie_.findNextState(neighborStatesPattern);
-
-            if (nextStateFromRule != NO_RULE_FOUND) {
-                nextState = nextStateFromRule;
-            }
+        if (dllRuleFunction_) {
+            const int* ns_data = neighborStatesPattern.empty() ? nullptr : neighborStatesPattern.data();
+            nextState = dllRuleFunction_(ns_data);
+        } else {
+            if (logger) logger->error("DLL function pointer is null in calculateNextGeneration. Cell state will persist.");
         }
 
         if (nextState != currentCellState) {

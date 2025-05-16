@@ -8,8 +8,7 @@ using json = nlohmann::json;
 
 Rule::Rule()
     : defaultState_(0),
-      loadedSuccessfully_(false),
-      ruleMode_("trie") // Default to Trie-based rules
+      loadedSuccessfully_(false)
 {
 }
 
@@ -126,102 +125,28 @@ bool Rule::parseNeighborhood(const json& j) {
 bool Rule::parseRuleSettings(const json& j) {
     auto logger = Logging::GetLogger(Logging::Module::Rule);
     // Reset member variables related to rules before parsing
-    ruleMode_ = "trie"; // Default to trie
     rules_.clear();
     ruleDllPath_.clear();
     ruleFunctionName_.clear();
 
-    std::string parsedRuleModeLocal = "trie"; // Use a local variable for initial parsing
-
-    if (j.contains("rule_mode") && j["rule_mode"].is_string()) {
-        parsedRuleModeLocal = j["rule_mode"].get<std::string>();
-        std::transform(parsedRuleModeLocal.begin(), parsedRuleModeLocal.end(), parsedRuleModeLocal.begin(), ::tolower);
-        if (logger) logger->info("Found 'rule_mode' in JSON: '" + parsedRuleModeLocal + "'");
-    } else {
-        if (logger) logger->warn("'rule_mode' not specified or not a string. Defaulting to 'trie'.");
-        // parsedRuleModeLocal remains "trie"
-    }
-
-    ruleMode_ = parsedRuleModeLocal; // Assign to member variable AFTER parsing it
-
     try {
-        if (ruleMode_ == "dll") {
-            if (logger) logger->info("Processing as DLL mode.");
-            if (!j.contains("rule_dll_path") || !j["rule_dll_path"].is_string()) {
-                if (logger) logger->error("'rule_dll_path' is missing or not a string for DLL rule mode.");
-                return false;
-            }
-            ruleDllPath_ = j["rule_dll_path"].get<std::string>();
-
-            if (!j.contains("rule_function_name") || !j["rule_function_name"].is_string()) {
-                if (logger) logger->error("'rule_function_name' is missing or not a string for DLL rule mode.");
-                return false;
-            }
-            ruleFunctionName_ = j["rule_function_name"].get<std::string>();
-            // rules_ was already cleared at the start of the function
-            if (logger) logger->info("DLL rule settings parsed. Path: " + ruleDllPath_ + ", Function: " + ruleFunctionName_);
-            return true; // Successfully parsed DLL settings
-
-        } else if (ruleMode_ == "trie") {
-            if (logger) logger->info("Processing as Trie mode.");
-            if (!j.contains("rules") || !j["rules"].is_array()) {
-                if (logger) logger->error("'rules' field is missing or not an array for Trie rule mode.");
-                return false; // This is the error you were seeing
-            }
-
-            size_t expectedRuleLength = neighborhood_.size() + 1;
-            if (neighborhood_.empty() && !j["rules"].empty()){ // Check if rules exist but neighborhood is empty
-                 if (logger) logger->error("'rules' are defined for Trie mode, but 'neighborhood' is empty. Cannot determine rule length.");
-                 return false;
-            }
-             if (j["rules"].empty()){ // It's okay for rules to be empty for Trie (e.g. static CA)
-                 if (logger) logger->warn("'rules' array is empty for Trie mode. CA may be static.");
-             }
-
-            for (const auto& rule_item : j["rules"]) {
-                if (!rule_item.is_array()) {
-                    if (logger) logger->error("Invalid rule entry in 'rules'; each rule must be an array.");
-                    return false;
-                }
-                std::vector<int> current_rule;
-                for(const auto& val : rule_item){
-                    if(!val.is_number_integer()){
-                        if (logger) logger->error("Invalid rule entry in 'rules'; all elements in a rule must be integers.");
-                        return false;
-                    }
-                    current_rule.push_back(val.get<int>());
-                }
-
-                if (!neighborhood_.empty() && current_rule.size() != expectedRuleLength) {
-                    if (logger) logger->error("Rule length mismatch in 'rules'. Expected " + std::to_string(expectedRuleLength) +
-                                           " elements, but got " + std::to_string(current_rule.size()) + ".");
-                    return false;
-                }
-                 // Validate states within the rule
-                for(int state_in_rule : current_rule) {
-                    bool stateFound = false;
-                    for(int validState : states_) {
-                        if (state_in_rule == validState) {
-                            stateFound = true;
-                            break;
-                        }
-                    }
-                    if (!stateFound) {
-                         if (logger) logger->error("Invalid state " + std::to_string(state_in_rule) + " found in a rule. All rule states must be defined in 'states'.");
-                         return false;
-                    }
-                }
-                rules_.push_back(current_rule);
-            }
-            if (logger) logger->info("Trie rule settings parsed. " + std::to_string(rules_.size()) + " rules.");
-            return true; // Successfully parsed Trie settings
-
-        } else {
-            if (logger) logger->error("Invalid 'rule_mode' value: '" + ruleMode_ + "'. Must be 'trie' or 'dll'.");
+        if (logger) logger->info("Processing as DLL mode.");
+        if (!j.contains("rule_dll_path") || !j["rule_dll_path"].is_string()) {
+            if (logger) logger->error("'rule_dll_path' is missing or not a string for DLL rule mode.");
             return false;
         }
+        ruleDllPath_ = j["rule_dll_path"].get<std::string>();
 
-    } catch (const json::exception& e) {
+        if (!j.contains("rule_function_name") || !j["rule_function_name"].is_string()) {
+            if (logger) logger->error("'rule_function_name' is missing or not a string for DLL rule mode.");
+            return false;
+        }
+        ruleFunctionName_ = j["rule_function_name"].get<std::string>();
+        // rules_ was already cleared at the start of the function
+        if (logger) logger->info("DLL rule settings parsed. Path: " + ruleDllPath_ + ", Function: " + ruleFunctionName_);
+        return true; // Successfully parsed DLL settings
+    }
+    catch (const json::exception& e) {
         if (logger) logger->error("JSON exception during parsing rule settings: " + std::string(e.what()));
         return false;
     }
@@ -350,10 +275,6 @@ int Rule::getDefaultState() const {
 
 const std::vector<Point>& Rule::getNeighborhood() const {
     return neighborhood_;
-}
-
-const std::string& Rule::getRuleMode() const {
-    return ruleMode_;
 }
 
 const std::vector<std::vector<int>>& Rule::getStateUpdateRules() const {

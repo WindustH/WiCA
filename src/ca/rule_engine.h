@@ -5,7 +5,6 @@
 #include <string>
 #include <unordered_map> // Added for the return type
 #include "../core/rule.h"
-#include "../utils/trie.h"
 #include "cell_space.h"
 #include "../utils/point.h" // For Point, and std::hash<Point> via cell_space.h or directly
 
@@ -21,8 +20,6 @@ typedef int (*RuleUpdateFunction)(const int* neighborStates);
 
 class RuleEngine {
 private:
-    // Trie-based members (used if ruleMode is "trie")
-    Trie ruleTrie_;
 
     // DLL-based members (used if ruleMode is "dll")
 #ifdef _WIN32
@@ -32,8 +29,6 @@ private:
 #endif
     RuleUpdateFunction dllRuleFunction_;
 
-    // Common members
-    std::string currentRuleMode_;
     std::vector<Point> neighborhood_;
     int defaultState_;
     bool initialized_;

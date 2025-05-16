@@ -55,7 +55,6 @@ set(PROJECT_SOURCES
     ${PROJECT_ROOT}/src/snap/snapshot.cpp
     ${PROJECT_ROOT}/src/snap/huffman_coding.cpp
     ${PROJECT_ROOT}/src/utils/error_handler.cpp
-    ${PROJECT_ROOT}/src/utils/trie.cpp
     ${PROJECT_ROOT}/src/utils/logger.cpp
 )
 
