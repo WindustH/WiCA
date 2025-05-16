@@ -325,7 +325,7 @@ void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) 
     int screenW = viewport.getScreenWidth();
     int screenH = viewport.getScreenHeight();
 
-    const auto& activeCellsMap = cellSpace.getActiveCells(); // This is now std::unordered_map
+    const auto& activeCellsMap = cellSpace.getNonDefaultCells(); // This is now std::unordered_map
 
     bool drawGridLines = false;
     switch (gridDisplayMode_) {

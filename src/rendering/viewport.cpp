@@ -146,7 +146,7 @@ void Viewport::updateAutoFit(const CellSpace& cellSpace) {
     if (!autoFitEnabled_) {
         return;
     }
-    if (!cellSpace.areBoundsInitialized() || cellSpace.getActiveCells().empty()) {
+    if (!cellSpace.areBoundsInitialized() || cellSpace.getNonDefaultCells().empty()) {
         // If no cells or bounds not init, reset to a default view (e.g., zoom 1.0, centered at origin)
         zoomLevel_ = 1.0f / (defaultCellSize_ / this->getDefaultCellSize()); // Normalize zoom to show defaultCellSize_ as actual default
         zoomLevel_ = 1.0f; // More simply, set zoom to 1.0

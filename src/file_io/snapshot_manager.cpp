@@ -50,7 +50,7 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
     writeInt32(serializedData, boundsValid ? maxBounds.y : 0);
 
 
-    const auto& activeCells = cellSpace.getActiveCells(); // This is std::unordered_map<Point, int>
+    const auto& activeCells = cellSpace.getNonDefaultCells(); // This is std::unordered_map<Point, int>
     std::uint32_t numActiveCells = static_cast<std::uint32_t>(activeCells.size());
     writeInt32(serializedData, static_cast<std::int32_t>(numActiveCells));
 
@@ -96,7 +96,7 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
                                    std::to_string(offset) + ", Data size: " + std::to_string(data.size()));
         }
 
-        cellSpace.loadActiveCells(loadedCells, minBounds, maxBounds);
+        cellSpace.loadCells(loadedCells, minBounds, maxBounds);
 
     } catch (const std::out_of_range& e) {
         ErrorHandler::logError("SnapshotManager: Deserialization error - " + std::string(e.what()));
@@ -122,7 +122,7 @@ bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& ce
     }
 
     std::vector<std::uint8_t> serialized_data = serializeCellSpace(cellSpace);
-    if (serialized_data.empty() && !cellSpace.getActiveCells().empty()) {
+    if (serialized_data.empty() && !cellSpace.getNonDefaultCells().empty()) {
         ErrorHandler::logError("SnapshotManager: Serialization produced empty data for non-empty cell space during save.");
     }
 

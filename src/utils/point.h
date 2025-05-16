@@ -2,6 +2,7 @@
 #define POINT_H
 
 #include <functional> // Required for std::hash
+#include <cstddef>    // Required for std::size_t
 
 // Defines a simple 2D point/vector structure for coordinates.
 struct Point {
@@ -42,13 +43,14 @@ namespace std {
     template <>
     struct hash<Point> {
         std::size_t operator()(const Point& p) const {
-            // A simple hash combining the x and y coordinates
-            // For more robust hashing, consider more complex hash functions
-            // or using a library like Boost's hash_combine.
-            auto h1 = std::hash<int>{}(p.x);
-            auto h2 = std::hash<int>{}(p.y);
-            // Simple XOR combination, can be improved
-            return h1 ^ (h2 << 1);
+            std::size_t seed = 0;
+            // Combine hash of p.x
+            // The magic number 0x9e3779b9 is derived from the golden ratio (phi).
+            // (sqrt(5)-1)/2 * 2^32. It's often used in hash functions.
+            seed ^= std::hash<int>{}(p.x) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            // Combine hash of p.y
+            seed ^= std::hash<int>{}(p.y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
         }
     };
 }

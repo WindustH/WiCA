@@ -34,7 +34,7 @@ private:
 
     // Common members
     std::string currentRuleMode_;
-    std::vector<Point> neighborhoodDefinition_;
+    std::vector<Point> neighborhood_;
     int defaultState_;
     bool initialized_;
 
@@ -63,7 +63,7 @@ public:
      * @return An unordered_map of (Point, int) for cells that change state.
      * The Point is the coordinate, and int is the new state.
      */
-    std::unordered_map<Point, int> calculateNextGeneration(const CellSpace& currentCellSpace) const;
+    std::unordered_map<Point, int> calculateForUpdate(const CellSpace& currentCellSpace) const;
 
     /**
      * @brief Checks if the RuleEngine has been successfully initialized.

@@ -15,7 +15,7 @@ Application::Application()
       currentConfigPath_(""), // Initialize currentConfigPath_
       inputHandler_(*this),
       commandParser_(*this),
-      cellSpace_(0),
+      cellSpace_(0,{}),
       ruleEngine_(),
       renderer_(),
       viewport_(DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, DEFAULT_CELL_PIXEL_SIZE),
@@ -87,7 +87,8 @@ bool Application::initializeSubsystems(const std::string& configPath) {
     }
 
     int configDefaultState = config_.getDefaultState(); // Will use internal default if not loaded
-    cellSpace_ = CellSpace(configDefaultState);
+    std::vector<Point> configNeighborhood = config_.getNeighborhood();
+    cellSpace_ = CellSpace(configDefaultState, configNeighborhood);
     std::cout << "[DEBUG] CellSpace initialized with default state: " << configDefaultState << std::endl;
 
     const auto& availableStates = config_.getStates();
@@ -130,7 +131,7 @@ bool Application::initializeSubsystems(const std::string& configPath) {
     setSimulationSpeed(simulationSpeed_);
 
     setAutoFitView(true);
-    if (cellSpace_.areBoundsInitialized() && !cellSpace_.getActiveCells().empty()) {
+    if (cellSpace_.areBoundsInitialized() && !cellSpace_.getNonDefaultCells().empty()) {
         centerViewOnGrid();
         viewport_.updateAutoFit(cellSpace_);
     } else {
@@ -202,7 +203,8 @@ void Application::loadConfiguration(const std::string& configPath) {
 
     // Re-initialize CellSpace
     int newDefaultState = config_.getDefaultState();
-    cellSpace_ = CellSpace(newDefaultState); // Creates a new CellSpace, clearing old one
+    std::vector<Point> newNeighborhood = config_.getNeighborhood();
+    cellSpace_ = CellSpace(newDefaultState, newNeighborhood); // Creates a new CellSpace, clearing old one
     std::cout << "[DEBUG] CellSpace re-initialized with new default state: " << newDefaultState << std::endl;
 
     // Re-initialize RuleEngine
@@ -284,7 +286,7 @@ void Application::updateSimulation() {
     if (simulationPaused_ || !ruleEngine_.isInitialized()) {
         return;
     }
-    std::unordered_map<Point, int> changes = ruleEngine_.calculateNextGeneration(cellSpace_);
+    std::unordered_map<Point, int> changes = ruleEngine_.calculateForUpdate(cellSpace_);
     if (!changes.empty()) {
         cellSpace_.updateCells(changes);
         if (viewport_.isAutoFitEnabled()) {
@@ -555,7 +557,7 @@ void Application::setAutoFitView(bool enabled) {
 }
 
 void Application::centerViewOnGrid() {
-    if (cellSpace_.areBoundsInitialized() && !cellSpace_.getActiveCells().empty()) {
+    if (cellSpace_.areBoundsInitialized() && !cellSpace_.getNonDefaultCells().empty()) {
         Point minB = cellSpace_.getMinBounds();
         Point maxB = cellSpace_.getMaxBounds();
         Viewport::PointF center(

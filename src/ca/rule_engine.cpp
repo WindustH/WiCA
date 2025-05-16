@@ -146,7 +146,7 @@ bool RuleEngine::initialize(const Rule& config) {
     }
 
     currentRuleMode_ = config.getRuleMode();
-    neighborhoodDefinition_ = config.getNeighborhood();
+    neighborhood_ = config.getNeighborhood();
     defaultState_ = config.getDefaultState();
 
     // ErrorHandler::logError("RuleEngine: Mode set to '" + currentRuleMode_ + "'.", false);
@@ -163,7 +163,7 @@ bool RuleEngine::initialize(const Rule& config) {
     } else if (currentRuleMode_ == "trie") {
         ruleTrie_ = Trie();
         const auto& rules = config.getStateUpdateRules();
-        if (neighborhoodDefinition_.empty() && !rules.empty()) {
+        if (neighborhood_.empty() && !rules.empty()) {
             ErrorHandler::logError("RuleEngine: Trie mode - Neighborhood is empty, but rules are defined. This may lead to incorrect behavior.", true);
         }
         unsigned int rulesLoadedCount = 0;
@@ -172,7 +172,7 @@ bool RuleEngine::initialize(const Rule& config) {
                 // ErrorHandler::logError("RuleEngine: Encountered an empty rule vector in config (Trie mode). Skipping.", false);
                 continue;
             }
-            if (ruleVector.size() != (neighborhoodDefinition_.size() + 1) ) {
+            if (ruleVector.size() != (neighborhood_.size() + 1) ) {
                 // ErrorHandler::logError("RuleEngine: Rule size mismatch (Trie mode). Expected " +
                 //                        std::to_string(neighborhoodDefinition_.size() + 1) +
                 //                        " elements (neighborhood pattern + result), but got " + std::to_string(ruleVector.size()) + ". Skipping rule.", false);
@@ -194,7 +194,7 @@ bool RuleEngine::initialize(const Rule& config) {
     return true;
 }
 
-std::unordered_map<Point, int> RuleEngine::calculateNextGeneration(const CellSpace& currentCellSpace) const {
+std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& currentCellSpace) const {
     std::unordered_map<Point, int> cellsToUpdate; // Changed from std::vector<std::pair<Point, int>>
 
     if (!initialized_) {
@@ -202,19 +202,11 @@ std::unordered_map<Point, int> RuleEngine::calculateNextGeneration(const CellSpa
         return cellsToUpdate; // Return empty map
     }
 
-    std::set<Point> cellsToEvaluate;
-    const auto& activeCells = currentCellSpace.getActiveCells();
-
-    for (const auto& pair : activeCells) {
-        cellsToEvaluate.insert(pair.first);
-        for (const Point& offset : neighborhoodDefinition_) {
-            cellsToEvaluate.insert(pair.first + offset);
-        }
-    }
+    const auto& cellsToEvaluate = currentCellSpace.getCellsToEvaluate();
 
     for (const Point& cellCoord : cellsToEvaluate) {
         int currentCellState = currentCellSpace.getCellState(cellCoord);
-        std::vector<int> neighborStatesPattern = currentCellSpace.getNeighborStates(cellCoord, neighborhoodDefinition_);
+        std::vector<int> neighborStatesPattern = currentCellSpace.getNeighborStates(cellCoord);
 
         int nextState = currentCellState;
 

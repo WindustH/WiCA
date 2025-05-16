@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include "../utils/point.h"
 #include <limits>
 
@@ -12,8 +13,13 @@
  */
 class CellSpace {
 private:
-    std::unordered_map<Point, int> activeCells_;
+    std::unordered_map<Point, int> nonDefaultCells_;
+    std::unordered_set<Point> cellsToEvaluate_;
+
     int defaultState_;
+    std::vector<Point> neighborhood_;
+    std::vector<Point> generalNeighborhood_;
+
 
     Point minGridBounds_;
     Point maxGridBounds_;
@@ -23,11 +29,11 @@ private:
     void recalculateBounds();
 
 public:
-    CellSpace(int defaultState);
+    CellSpace(int defaultState, std::vector<Point> neighborhood);
 
     int getCellState(Point coordinates) const;
     void setCellState(Point coordinates, int state);
-    std::vector<int> getNeighborStates(Point centerCoordinates, const std::vector<Point>& neighborhoodDefinition) const;
+    std::vector<int> getNeighborStates(Point centerCoordinates) const;
 
     /**
      * @brief Applies a map of pending state changes to the grid.
@@ -37,14 +43,16 @@ public:
      */
     void updateCells(const std::unordered_map<Point, int>& cellsToUpdate);
 
-    const std::unordered_map<Point, int>& getActiveCells() const;
-    void loadActiveCells(const std::unordered_map<Point, int>& cells, Point minBounds, Point maxBounds);
+    const std::unordered_map<Point, int>& getNonDefaultCells() const;
+    const std::unordered_set<Point>& getCellsToEvaluate() const;
+    void loadCells(const std::unordered_map<Point, int>& cells, Point minBounds, Point maxBounds);
 
     Point getMinBounds() const;
     Point getMaxBounds() const;
     bool areBoundsInitialized() const;
 
     void clear();
+    void clearCellsToEvaluate();
     int getDefaultState() const;
 };
 
