@@ -8,11 +8,11 @@
 #include "rule.h"
 #include "../ca/cell_space.h"
 #include "../ca/rule_engine.h"
-#include "../rendering/renderer.h"
-#include "../rendering/viewport.h"
+#include "../render/renderer.h"
+#include "../render/viewport.h"
 #include "../input/input_handler.h"
 #include "../input/command_parser.h"
-#include "../file_io/snapshot_manager.h"
+#include "../snap/snapshot.h"
 #include "../utils/point.h"
 
 

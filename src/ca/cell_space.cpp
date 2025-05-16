@@ -14,7 +14,7 @@ CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
     neighborhood_(neighborhood) {
 
     auto logger = Logging::GetLogger(Logging::Module::CellSpace);
-    if (logger) logger->trace("Called CellSpace::CellSpace");
+    if (logger) logger->info("Start to initialize cellspace.");
 
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
@@ -27,7 +27,7 @@ CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
     }
     reverseNeighborhood_.assign(generalNeighborhoodSet.begin(), generalNeighborhoodSet.end());
 
-    if (logger) logger->info("CellSpace created.");
+    if (logger) logger->info("CellSpace initialized.");
 
 }
 
@@ -156,9 +156,7 @@ void CellSpace::updateCells(const std::unordered_map<Point, int>& cellsToUpdate)
         minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
         maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
     } else if (boundaryPotentiallyAffected) {
-        // If any operation (addition or removal) could have affected the boundary,
-        // it's safest to recalculate. UpdateBounds only expands.
-        // recalculateBounds();
+
     }
 }
 

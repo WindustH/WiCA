@@ -1,8 +1,8 @@
 #include "command_parser.h"
 #include "../core/application.h"
 #include "../ca/cell_space.h"
-#include "../rendering/viewport.h"
-#include "../file_io/snapshot_manager.h"
+#include "../render/viewport.h"
+#include "../snap/snapshot.h"
 #include "../utils/logger.h" // New logger
 
 #include <algorithm>

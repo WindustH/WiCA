@@ -1,5 +1,5 @@
-#ifndef SNAPSHOT_MANAGER_H
-#define SNAPSHOT_MANAGER_H
+#ifndef SNAPSHOT_H
+#define SNAPSHOT_H
 
 #include <string>
 #include <vector>

@@ -23,6 +23,7 @@ RuleEngine::~RuleEngine() {
 bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const std::string& functionName) {
     auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
     unloadRuleLibrary();
+    if (logger) logger->info("Start to load DLL.");
 
     if (dllPathBaseFromConfig.empty() || functionName.empty()) {
         if (logger) logger->error("DLL path or function name is empty. Cannot load library.");
@@ -112,6 +113,8 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
         return false;
     }
 #endif
+
+    if (logger) logger->info("DLL loaded.");
     return true;
 }
 
@@ -130,6 +133,7 @@ void RuleEngine::unloadRuleLibrary() {
 
 bool RuleEngine::initialize(const Rule& config) {
     auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
+    if (logger) logger->info("Start to initialize rule engine.");
     initialized_ = false;
     unloadRuleLibrary();
 
@@ -175,6 +179,7 @@ bool RuleEngine::initialize(const Rule& config) {
         return false;
     }
 
+    if (logger) logger->info("Rule engine initialized.");
     initialized_ = true;
     return true;
 }

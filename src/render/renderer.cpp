@@ -34,28 +34,34 @@ Renderer::~Renderer() {
 
 bool Renderer::initializeTTF() {
     auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Start to initialize TTF.");
     if (uiComponentsInitialized_) return true;
 
     if (TTF_Init() == -1) {
-        if (logger) logger->error("TTF_Init failed");
+        if (logger) logger->error("TTF initialization failed.");
         uiComponentsInitialized_ = false;
         return false;
     }
     // std::cout << "[DEBUG] TTF_Init successful." << std::endl;
     uiComponentsInitialized_ = true;
+
+    if (logger) logger->info("TTF initialized.");
     return true;
 }
 
 void Renderer::cleanupTTF() {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Start to clean up TTF.");
     if (uiComponentsInitialized_) {
         TTF_Quit();
         uiComponentsInitialized_ = false;
-        // std::cout << "[DEBUG] Renderer: TTF_Quit called." << std::endl;
     }
+    if (logger) logger->info("TTF cleaned up.");
 }
 
 bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize, bool isFullPath) {
     auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Start to load font.");
     if (!uiComponentsInitialized_) {
         if (logger) logger->error("TTF system not initialized. Cannot load font.");
         return false;
@@ -82,7 +88,7 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
             //  std::cout << "[DEBUG] Renderer::loadFontInternal - Asset font failed. Trying as system font: " << fontIdentifier << std::endl;
             uiFont_ = TTF_OpenFont(fontIdentifier.c_str(), fontSize);
             if (!uiFont_) {
-                if (logger) logger->error("TTF_OpenFont failed for '" + pathToTry + "' (and as system font '" + fontIdentifier + "'). SDL_ttf Error: " + std::string(TTF_GetError()));
+                if (logger) logger->error("Failed for '" + pathToTry + "' (and as system font '" + fontIdentifier + "'). SDL_ttf Error: " + std::string(TTF_GetError()));
                 fontLoadedSuccessfully_ = false;
                 currentFontName_ = "";
                 currentFontPath_ = "";
@@ -93,7 +99,7 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
                  currentFontName_ = fontIdentifier; // Can be the same for system fonts
             }
         } else {
-            if (logger) logger->error("TTF_OpenFont failed for full path '" + pathToTry + "'. SDL_ttf Error: " + std::string(TTF_GetError()));
+            if (logger) logger->error("Failed for full path '" + pathToTry + "'. SDL_ttf Error: " + std::string(TTF_GetError()));
             fontLoadedSuccessfully_ = false;
             currentFontName_ = "";
             currentFontPath_ = "";
@@ -112,11 +118,14 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
 
     currentFontSize_ = fontSize;
     fontLoadedSuccessfully_ = true;
+
+    if (logger) logger->info("Font loaded.");
     return true;
 }
 
 bool Renderer::loadDefaultFont(int fontSize) {
     auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Start to load default font.");
     const char* defaultFontNames[] = {
         "default.ttf", // Example: "arial.ttf" or a known font in assets/fonts/
         nullptr
@@ -168,6 +177,7 @@ void Renderer::reinitializeColors(const Rule& newConfig) {
 
 bool Renderer::initialize(SDL_Window* window, const Rule& config) {
     auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Start to initialize renderer.");
     if (!window) {
         if (logger) logger->error("Provided window is null.");
         return false;
@@ -186,7 +196,7 @@ bool Renderer::initialize(SDL_Window* window, const Rule& config) {
     SDL_SetRenderDrawBlendMode(sdlRenderer_, SDL_BLENDMODE_BLEND);
 
     if (!initializeTTF()) {
-        if (logger) logger->error(": Failed to initialize TTF system. UI text might not be available.");
+        if (logger) logger->error("Failed to initialize TTF system. UI text might not be available.");
         // Continue without font if TTF fails, but log it.
     } else {
         if (!loadDefaultFont(currentFontSize_)) { // currentFontSize_ is 16 by default
@@ -195,7 +205,7 @@ bool Renderer::initialize(SDL_Window* window, const Rule& config) {
     }
     reinitializeColors(config);
 
-    if (logger) logger->info("Initialized successfully.");
+    if (logger) logger->info("Renderer initialized successfully.");
     return true;
 }
 
@@ -297,7 +307,7 @@ void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) 
         backgroundColor = it_default_color->second;
     } else {
         // Fallback if default state's color isn't in map for some reason
-        if (logger) logger->info("Default state " + std::to_string(defaultStateVal) + " color not found in map. Using fallback background.");
+        if (logger) logger->warn("Default state " + std::to_string(defaultStateVal) + " color not found in map. Using fallback background.");
     }
 
     SDL_SetRenderDrawColor(sdlRenderer_, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
@@ -594,20 +604,18 @@ void Renderer::presentScreen() {
 }
 
 void Renderer::cleanup() {
-    // std::cout << "[DEBUG] Renderer::cleanup() called." << std::endl;
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
+    if (logger) logger->info("Renderer clean-up called.");
     if (uiFont_) {
         TTF_CloseFont(uiFont_);
         uiFont_ = nullptr;
-        fontLoadedSuccessfully_ = false; // Reset flag
-        // std::cout << "[DEBUG] Renderer: UI Font closed." << std::endl;
+        fontLoadedSuccessfully_ = false;
     }
-    cleanupTTF(); // This handles TTF_Quit
+    cleanupTTF();
     if (sdlRenderer_) {
         SDL_DestroyRenderer(sdlRenderer_);
         sdlRenderer_ = nullptr;
-        // std::cout << "[DEBUG] Renderer: SDL_DestroyRenderer called." << std::endl;
     }
-    // sdlWindow_ is owned by Application, not destroyed here.
 }
 
 bool Renderer::isUiReady() const {

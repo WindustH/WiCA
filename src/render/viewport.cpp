@@ -40,14 +40,7 @@ void Viewport::zoom(float factor, Point mouseScreenPos) {
     PointF worldP_before = screenToWorldF(zoomCenterScreen); // Use float version for precision
 
     zoomLevel_ *= factor;
-    // Add limits to zoomLevel if desired (e.g., minZoom, maxZoom)
-    // zoomLevel_ = std::max(0.1f, std::min(zoomLevel_, 20.0f));
 
-
-    // Convert zoom center back to screen coordinates with new zoom, then find new offset
-    // To keep worldP_before at zoomCenterScreen after zoom:
-    // worldP_before.x = viewOffset_.x + static_cast<float>(zoomCenterScreen.x) / (defaultCellSize_ * zoomLevel_)
-    // viewOffset_.x = worldP_before.x - static_cast<float>(zoomCenterScreen.x) / getCurrentCellSize();
 
     float currentCellPixelSize = getCurrentCellSize(); // Store to avoid re-calculation
     if (std::abs(currentCellPixelSize) < 1e-6f) { // Avoid division by zero

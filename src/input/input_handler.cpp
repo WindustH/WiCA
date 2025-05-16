@@ -1,7 +1,7 @@
 #include "input_handler.h"
 #include "../core/application.h"
 #include "../ca/cell_space.h"
-#include "../rendering/viewport.h"
+#include "../render/viewport.h"
 #include "../utils/error_handler.h"
 #include <cstring> // For strlen in SDL_TEXTINPUT handling
 /**

@@ -18,12 +18,12 @@ std::string ModuleToString(Module module) {
         case Module::CommandParser:   return "CommandParser";
         case Module::CellSpace:       return "CellSpace";
         case Module::RuleEngine:      return "RuleEngine";
-        case Module::SnapshotManager: return "SnapshotManager";
+        case Module::Snapshot:        return "Snapshot";
         case Module::FileIO:          return "FileIO";
         case Module::Utils:           return "Utils";
         case Module::Main:            return "Main";
         case Module::ErrorHandler:    return "ErrorHandler";
-        case Module::Rule:          return "Rule";
+        case Module::Rule:            return "Rule";
         case Module::Huffman:         return "Huffman";
         default:                      return "Unknown";
     }
@@ -49,7 +49,7 @@ void Init(const std::string& logFilePath, spdlog::level::level_enum globalLevel)
         std::vector<Module> all_modules = {
             Module::Core, Module::Renderer, Module::Input, Module::UI,
             Module::CommandParser, Module::CellSpace, Module::RuleEngine,
-            Module::SnapshotManager, Module::FileIO, Module::Utils, Module::Main,
+            Module::Snapshot, Module::FileIO, Module::Utils, Module::Main,
             Module::ErrorHandler, Module::Rule, Module::Huffman
         };
 

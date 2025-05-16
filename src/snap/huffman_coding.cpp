@@ -249,7 +249,8 @@ namespace HuffmanCoding {
         // 2. Read frequency table
         std::uint32_t freqTableNumEntries = 0;
         if (currentByteIndex + sizeof(std::uint32_t) > compressedData.size()) {
-             if (logger) logger->error("Decompress - Not enough data for frequency table size."); return {};
+            if (logger) logger->error("Decompress - Not enough data for frequency table size.");
+            return {};
         }
         for (size_t i = 0; i < sizeof(std::uint32_t); ++i) {
             freqTableNumEntries |= (static_cast<std::uint32_t>(compressedData[currentByteIndex++]) << (i * 8));
@@ -258,7 +259,8 @@ namespace HuffmanCoding {
         std::map<std::uint8_t, unsigned> freqTable;
         for (std::uint32_t i = 0; i < freqTableNumEntries; ++i) {
             if (currentByteIndex + 1 + sizeof(std::uint32_t) > compressedData.size()) {
-                if (logger) logger->error("Decompress - Not enough data for frequency table entry."); return {};
+                if (logger) logger->error("Decompress - Not enough data for frequency table entry.");
+                return {};
             }
             std::uint8_t byte = compressedData[currentByteIndex++];
             unsigned freq = 0;

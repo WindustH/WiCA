@@ -19,7 +19,7 @@ enum class Module {
     CommandParser,
     CellSpace,
     RuleEngine,
-    SnapshotManager,
+    Snapshot,
     FileIO,
     Utils,
     Main,

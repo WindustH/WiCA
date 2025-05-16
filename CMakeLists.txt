@@ -48,12 +48,12 @@ set(PROJECT_SOURCES
     ${PROJECT_ROOT}/src/core/rule.cpp
     ${PROJECT_ROOT}/src/ca/cell_space.cpp
     ${PROJECT_ROOT}/src/ca/rule_engine.cpp
-    ${PROJECT_ROOT}/src/rendering/renderer.cpp
-    ${PROJECT_ROOT}/src/rendering/viewport.cpp
+    ${PROJECT_ROOT}/src/render/renderer.cpp
+    ${PROJECT_ROOT}/src/render/viewport.cpp
     ${PROJECT_ROOT}/src/input/input_handler.cpp
     ${PROJECT_ROOT}/src/input/command_parser.cpp
-    ${PROJECT_ROOT}/src/file_io/snapshot_manager.cpp
-    ${PROJECT_ROOT}/src/file_io/huffman_coding.cpp
+    ${PROJECT_ROOT}/src/snap/snapshot.cpp
+    ${PROJECT_ROOT}/src/snap/huffman_coding.cpp
     ${PROJECT_ROOT}/src/utils/error_handler.cpp
     ${PROJECT_ROOT}/src/utils/trie.cpp
     ${PROJECT_ROOT}/src/utils/logger.cpp
