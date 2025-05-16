@@ -1,38 +1,23 @@
 #include "error_handler.h"
+#include "logger.h" // Use the new logger
 #include <cstdlib> // For exit, EXIT_FAILURE
+#include <SDL2/SDL_error.h> // For SDL_GetError()
 #include <iostream>
 
 namespace ErrorHandler {
 
-    /**
-     * @brief Logs a general error message to std::cerr.
-     * @param message The error message to log.
-     * @param isFatal If true, the function will call exit(EXIT_FAILURE) after logging.
-     */
-    void logError(const std::string& message, bool isFatal) {
-        std::cerr << "ERROR: " << message << std::endl;
-        if (isFatal) {
-            // Consider more graceful shutdown if resources need cleanup
-            exit(EXIT_FAILURE);
-        }
-    }
+    void failure(const std::string& message) {
+        // Get the dedicated logger for ErrorHandler messages
+        auto logger = Logging::GetLogger(Logging::Module::ErrorHandler);
 
-    /**
-     * @brief Logs an error message related to an SDL function call.
-     *
-     * This function appends the specific SDL error message obtained via SDL_GetError()
-     * to the provided context string.
-     * @param context A string describing the context in which the SDL error occurred.
-     * @param isFatal If true, the function will call exit(EXIT_FAILURE) after logging.
-     */
-    void sdlError(const std::string& context, bool isFatal) {
-        std::cerr << "SDL_ERROR: " << context << " - " << SDL_GetError() << std::endl;
-        if (isFatal) {
-            // Consider more graceful shutdown if resources need cleanup
-            // SDL_Quit() should ideally be called in a central cleanup location
-            // if the program is exiting due to an SDL error after SDL_Init.
+        if (!logger) {
+            // Fallback to std::cerr if logger is somehow unavailable (should not happen after Init)
+            std::cerr << "FATAL ERROR (logger unavailable): " << message << std::endl;
             exit(EXIT_FAILURE);
+            return;
         }
+        logger->critical(message);
+        exit(EXIT_FAILURE);
     }
 
 } // namespace ErrorHandler

@@ -1,8 +1,9 @@
 #include "cell_space.h"
 #include <algorithm> // For std::min and std::max
-#include <iostream>  // For std::cout debugging
 #include <unordered_map> // Ensure it's included
+#include "../utils/logger.h" // New logger
 #include <set>
+
 /**
  * @brief Constructor for CellSpace.
  * @param defaultState The default state for cells in the grid.
@@ -10,8 +11,11 @@
 CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
     : defaultState_(defState),
     boundsInitialized_(false),
-    neighborhood_(neighborhood)
-    {
+    neighborhood_(neighborhood) {
+
+    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    if (logger) logger->trace("Called CellSpace::CellSpace");
+
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
 
@@ -22,6 +26,9 @@ CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
         }
     }
     reverseNeighborhood_.assign(generalNeighborhoodSet.begin(), generalNeighborhoodSet.end());
+
+    if (logger) logger->info("CellSpace created.");
+
 }
 
 /**
@@ -45,6 +52,9 @@ void CellSpace::updateBounds(Point coordinates) {
  * @brief Recalculates the entire bounding box based on current active cells.
  */
 void CellSpace::recalculateBounds() {
+    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    if (logger) logger->trace("Called CellSpace::recalculateBounds");
+
     boundsInitialized_ = false;
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
@@ -126,6 +136,9 @@ std::vector<int> CellSpace::getNeighborStates(Point centerCoordinates) const {
  * Before update, the cells to be evaluate will be cleared.
  */
 void CellSpace::updateCells(const std::unordered_map<Point, int>& cellsToUpdate) {
+    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    if (logger) logger->debug("Received cells to update. Start to apply update.");
+
     clearCellsToEvaluate();
 
     if (cellsToUpdate.empty()) return;
@@ -159,6 +172,9 @@ const std::unordered_set<Point>& CellSpace::getCellsToEvaluate() const {
 }
 
 void CellSpace::loadCells(const std::unordered_map<Point, int>& cells, Point minB, Point maxB) {
+    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    if (logger) logger->info("Received cells to load. Start to load cells.");
+
     nonDefaultCells_ = cells;
     if (nonDefaultCells_.empty()) {
         boundsInitialized_ = false;
@@ -176,6 +192,9 @@ void CellSpace::loadCells(const std::unordered_map<Point, int>& cells, Point min
             cellsToEvaluate_.insert(offset+pair.first);
         }
     }
+
+    if (logger) logger->info("Cells loaded.");
+
 }
 
 Point CellSpace::getMinBounds() const {
@@ -197,11 +216,17 @@ bool CellSpace::areBoundsInitialized() const {
 }
 
 void CellSpace::clear() {
+    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    if (logger) logger->info("Start to clear the cellspace.");
+
     nonDefaultCells_.clear();
     cellsToEvaluate_.clear();
     boundsInitialized_ = false;
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
+
+    if (logger) logger->info("Cellspace cleared.");
+
 }
 
 void CellSpace::clearCellsToEvaluate() {

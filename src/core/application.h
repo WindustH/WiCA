@@ -31,7 +31,7 @@ private:
     SDL_Window* window_;
     SDL_GLContext glContext_;
 
-    Rule config_; // Current configuration
+    Rule rule_; // Current configuration
     std::string currentConfigPath_; // Path to the current configuration file
 
     InputHandler inputHandler_;
@@ -86,7 +86,7 @@ public:
      * @brief Loads a new configuration file and reinitializes the simulation.
      * @param configPath Path to the new JSON configuration file.
      */
-    void loadConfiguration(const std::string& configPath);
+    void loadRule(const std::string& configPath);
 
     // Simulation control
     void togglePause();

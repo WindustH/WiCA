@@ -1,5 +1,5 @@
 #include "rule.h"
-#include "../utils/error_handler.h"
+#include "../utils/logger.h" // New logger
 #include <fstream>
 #include <stdexcept>
 #include <algorithm> // Required for std::transform
@@ -14,33 +14,34 @@ Rule::Rule()
 }
 
 bool Rule::loadFromFile(const std::string& filePath) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     loadedSuccessfully_ = false;
 
     std::ifstream configFileStream(filePath);
     if (!configFileStream.is_open()) {
-        ErrorHandler::logError("Config: Failed to open configuration file: " + filePath);
+        if (logger) logger->error("Failed to open configuration file: " + filePath);
         return false;
     }
 
-    json configJson;
+    json ruleJson;
     try {
-        configFileStream >> configJson;
+        configFileStream >> ruleJson;
     } catch (json::parse_error& e) {
-        ErrorHandler::logError("Config: JSON parsing error in file " + filePath + " - " + e.what());
+        if (logger) logger->error("JSON parsing error in file " + filePath + " - " + e.what());
         return false;
     } catch (const std::exception& e) { // Catch generic std::exception
-        ErrorHandler::logError("Config: Generic error reading file " + filePath + " - " + std::string(e.what()));
+        if (logger) logger->error("Generic error reading file " + filePath + " - " + std::string(e.what()));
         return false;
     }
 
-    if (!parseStates(configJson)) return false;
-    if (!parseDefaultState(configJson)) return false;
-    if (!parseNeighborhood(configJson)) return false;
-    if (!parseRuleSettings(configJson)) return false;
-    if (!parseStateColorMap(configJson)) return false;
+    if (!parseStates(ruleJson)) return false;
+    if (!parseDefaultState(ruleJson)) return false;
+    if (!parseNeighborhood(ruleJson)) return false;
+    if (!parseRuleSettings(ruleJson)) return false;
+    if (!parseStateColorMap(ruleJson)) return false;
 
     loadedSuccessfully_ = true;
-    ErrorHandler::logError("Config: Configuration loaded successfully from " + filePath, false);
+    if (logger) logger->info("Configuration loaded successfully from " + filePath);
     return true;
 }
 
@@ -49,27 +50,29 @@ bool Rule::isLoaded() const {
 }
 
 bool Rule::parseStates(const json& j) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     try {
         if (!j.contains("states") || !j["states"].is_array()) {
-            ErrorHandler::logError("Config: 'states' field is missing or not an array.");
+            if (logger) logger->error("'states' field is missing or not an array.");
             return false;
         }
         states_ = j["states"].get<std::vector<int>>();
         if (states_.empty()) {
-            ErrorHandler::logError("Config: 'states' array cannot be empty.");
+            if (logger) logger->error("'states' array cannot be empty.");
             return false;
         }
-    } catch (const json::exception& e) { // Catch nlohmann::json specific exceptions
-        ErrorHandler::logError("Config: Error parsing 'states': " + std::string(e.what()));
+    } catch (const json::exception& e) {
+        if (logger) logger->error("Error parsing 'states': " + std::string(e.what()));
         return false;
     }
     return true;
 }
 
 bool Rule::parseDefaultState(const json& j) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     try {
         if (!j.contains("default_state") || !j["default_state"].is_number_integer()) {
-            ErrorHandler::logError("Config: 'default_state' field is missing or not an integer.");
+            if (logger) logger->error("'default_state' field is missing or not an integer.");
             return false;
         }
         defaultState_ = j["default_state"].get<int>();
@@ -85,26 +88,27 @@ bool Rule::parseDefaultState(const json& j) {
             }
         }
         if (!found) {
-            ErrorHandler::logError("Config: 'default_state' (" + std::to_string(defaultState_) + ") is not in the list of defined 'states'.");
+            if (logger) logger->error("'default_state' (" + std::to_string(defaultState_) + ") is not in the list of defined 'states'.");
             return false;
         }
     } catch (const json::exception& e) {
-        ErrorHandler::logError("Config: Error parsing 'default_state': " + std::string(e.what()));
+        if (logger) logger->error("Error parsing 'default_state': " + std::string(e.what()));
         return false;
     }
     return true;
 }
 
 bool Rule::parseNeighborhood(const json& j) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     try {
         if (!j.contains("neighborhood") || !j["neighborhood"].is_array()) {
-            ErrorHandler::logError("Config: 'neighborhood' field is missing or not an array. This is required for both Trie and DLL (for neighbor count) modes.");
+            if (logger) logger->error("'neighborhood' field is missing or not an array. This is required for both Trie and DLL (for neighbor count) modes.");
             return false;
         }
         neighborhood_.clear();
         for (const auto& item : j["neighborhood"]) {
             if (!item.is_array() || item.size() != 2 || !item[0].is_number_integer() || !item[1].is_number_integer()) {
-                ErrorHandler::logError("Config: Invalid neighborhood entry. Each entry must be an array of two integers [dx, dy].");
+                if (logger) logger->error("Invalid neighborhood entry. Each entry must be an array of two integers [dx, dy].");
                 return false;
             }
             neighborhood_.emplace_back(item[0].get<int>(), item[1].get<int>());
@@ -113,13 +117,14 @@ bool Rule::parseNeighborhood(const json& j) {
         // but the DLL function signature still needs neighborCount.
         // If it's empty for Trie mode, it's usually an issue if rules are present.
     } catch (const json::exception& e) {
-        ErrorHandler::logError("Config: Error parsing 'neighborhood': " + std::string(e.what()));
+        if (logger) logger->error("Error parsing 'neighborhood': " + std::string(e.what()));
         return false;
     }
     return true;
 }
 
 bool Rule::parseRuleSettings(const json& j) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     // Reset member variables related to rules before parsing
     ruleMode_ = "trie"; // Default to trie
     rules_.clear();
@@ -131,9 +136,9 @@ bool Rule::parseRuleSettings(const json& j) {
     if (j.contains("rule_mode") && j["rule_mode"].is_string()) {
         parsedRuleModeLocal = j["rule_mode"].get<std::string>();
         std::transform(parsedRuleModeLocal.begin(), parsedRuleModeLocal.end(), parsedRuleModeLocal.begin(), ::tolower);
-        ErrorHandler::logError("Config: Found 'rule_mode' in JSON: '" + parsedRuleModeLocal + "'", false);
+        if (logger) logger->info("Found 'rule_mode' in JSON: '" + parsedRuleModeLocal + "'");
     } else {
-        ErrorHandler::logError("Config: 'rule_mode' not specified or not a string. Defaulting to 'trie'.", false);
+        if (logger) logger->warn("'rule_mode' not specified or not a string. Defaulting to 'trie'.");
         // parsedRuleModeLocal remains "trie"
     }
 
@@ -141,54 +146,54 @@ bool Rule::parseRuleSettings(const json& j) {
 
     try {
         if (ruleMode_ == "dll") {
-            ErrorHandler::logError("Config: Processing as DLL mode.", false);
+            if (logger) logger->info("Processing as DLL mode.");
             if (!j.contains("rule_dll_path") || !j["rule_dll_path"].is_string()) {
-                ErrorHandler::logError("Config: 'rule_dll_path' is missing or not a string for DLL rule mode.");
+                if (logger) logger->error("'rule_dll_path' is missing or not a string for DLL rule mode.");
                 return false;
             }
             ruleDllPath_ = j["rule_dll_path"].get<std::string>();
 
             if (!j.contains("rule_function_name") || !j["rule_function_name"].is_string()) {
-                ErrorHandler::logError("Config: 'rule_function_name' is missing or not a string for DLL rule mode.");
+                if (logger) logger->error("'rule_function_name' is missing or not a string for DLL rule mode.");
                 return false;
             }
             ruleFunctionName_ = j["rule_function_name"].get<std::string>();
             // rules_ was already cleared at the start of the function
-            ErrorHandler::logError("Config: DLL rule settings parsed. Path: " + ruleDllPath_ + ", Function: " + ruleFunctionName_, false);
+            if (logger) logger->info("DLL rule settings parsed. Path: " + ruleDllPath_ + ", Function: " + ruleFunctionName_);
             return true; // Successfully parsed DLL settings
 
         } else if (ruleMode_ == "trie") {
-            ErrorHandler::logError("Config: Processing as Trie mode.", false);
+            if (logger) logger->info("Processing as Trie mode.");
             if (!j.contains("rules") || !j["rules"].is_array()) {
-                ErrorHandler::logError("Config: 'rules' field is missing or not an array for Trie rule mode.");
+                if (logger) logger->error("'rules' field is missing or not an array for Trie rule mode.");
                 return false; // This is the error you were seeing
             }
 
             size_t expectedRuleLength = neighborhood_.size() + 1;
             if (neighborhood_.empty() && !j["rules"].empty()){ // Check if rules exist but neighborhood is empty
-                 ErrorHandler::logError("Config: 'rules' are defined for Trie mode, but 'neighborhood' is empty. Cannot determine rule length.");
+                 if (logger) logger->error("'rules' are defined for Trie mode, but 'neighborhood' is empty. Cannot determine rule length.");
                  return false;
             }
              if (j["rules"].empty()){ // It's okay for rules to be empty for Trie (e.g. static CA)
-                 ErrorHandler::logError("Config: 'rules' array is empty for Trie mode. CA may be static.", false);
+                 if (logger) logger->warn("'rules' array is empty for Trie mode. CA may be static.");
              }
 
             for (const auto& rule_item : j["rules"]) {
                 if (!rule_item.is_array()) {
-                    ErrorHandler::logError("Config: Invalid rule entry in 'rules'; each rule must be an array.");
+                    if (logger) logger->error("Invalid rule entry in 'rules'; each rule must be an array.");
                     return false;
                 }
                 std::vector<int> current_rule;
                 for(const auto& val : rule_item){
                     if(!val.is_number_integer()){
-                        ErrorHandler::logError("Config: Invalid rule entry in 'rules'; all elements in a rule must be integers.");
+                        if (logger) logger->error("Invalid rule entry in 'rules'; all elements in a rule must be integers.");
                         return false;
                     }
                     current_rule.push_back(val.get<int>());
                 }
 
                 if (!neighborhood_.empty() && current_rule.size() != expectedRuleLength) {
-                    ErrorHandler::logError("Config: Rule length mismatch in 'rules'. Expected " + std::to_string(expectedRuleLength) +
+                    if (logger) logger->error("Rule length mismatch in 'rules'. Expected " + std::to_string(expectedRuleLength) +
                                            " elements, but got " + std::to_string(current_rule.size()) + ".");
                     return false;
                 }
@@ -202,33 +207,31 @@ bool Rule::parseRuleSettings(const json& j) {
                         }
                     }
                     if (!stateFound) {
-                         ErrorHandler::logError("Config: Invalid state " + std::to_string(state_in_rule) + " found in a rule. All rule states must be defined in 'states'.");
+                         if (logger) logger->error("Invalid state " + std::to_string(state_in_rule) + " found in a rule. All rule states must be defined in 'states'.");
                          return false;
                     }
                 }
                 rules_.push_back(current_rule);
             }
-            ErrorHandler::logError("Config: Trie rule settings parsed. " + std::to_string(rules_.size()) + " rules.", false);
+            if (logger) logger->info("Trie rule settings parsed. " + std::to_string(rules_.size()) + " rules.");
             return true; // Successfully parsed Trie settings
 
         } else {
-            ErrorHandler::logError("Config: Invalid 'rule_mode' value: '" + ruleMode_ + "'. Must be 'trie' or 'dll'.");
+            if (logger) logger->error("Invalid 'rule_mode' value: '" + ruleMode_ + "'. Must be 'trie' or 'dll'.");
             return false;
         }
 
     } catch (const json::exception& e) {
-        ErrorHandler::logError("Config: JSON exception during parsing rule settings: " + std::string(e.what()));
+        if (logger) logger->error("JSON exception during parsing rule settings: " + std::string(e.what()));
         return false;
     }
-    // Fallback, should not be reached if logic is correct
-    // ErrorHandler::logError("Config: Unexpected fallthrough in parseRuleSettings.", true);
-    // return false;
 }
 
 // Helper function for default color assignment (to avoid repetition)
 void assignDefaultColors(std::map<int, Color>& mapToFill, const std::vector<int>& states) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     mapToFill.clear(); // Ensure we start fresh
-    ErrorHandler::logError("Config: Assigning default colors for states.", false); // Informative message
+    if (logger) logger->info("Assigning default colors for states."); // Informative message
     for (int s : states) {
         // Using the specific default logic from your original "missing field" handling
         if (s == 0) {
@@ -243,18 +246,19 @@ void assignDefaultColors(std::map<int, Color>& mapToFill, const std::vector<int>
 }
 
 bool Rule::parseStateColorMap(const nlohmann::json& j) {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     try {
         stateColorMap_.clear(); // Start with an empty map
         bool format_valid = true; // Assume format is valid initially
 
         if (!j.contains("state_color_map")) {
-            ErrorHandler::logError("Config: 'state_color_map' field is missing.", false);
+            if (logger) logger->warn("'state_color_map' field is missing.");
             format_valid = false;
         } else {
             const auto& color_map_json = j["state_color_map"];
 
             if (!color_map_json.is_array()) {
-                ErrorHandler::logError("Config: 'state_color_map' field is not a JSON array.", false);
+                if (logger) logger->warn("'state_color_map' field is not a JSON array.");
                 format_valid = false;
             } else {
                 // It's an array, now validate its contents
@@ -264,15 +268,15 @@ bool Rule::parseStateColorMap(const nlohmann::json& j) {
 
                     // Check 1: Is the element itself an array?
                     if (!color_array_json.is_array()) {
-                        ErrorHandler::logError("Config: Element at index " + std::to_string(i) + " in 'state_color_map' is not a color array.", false);
+                        if (logger) logger->warn("Element at index " + std::to_string(i) + " in 'state_color_map' is not a color array.");
                         format_valid = false;
                         break; // Stop processing this array on first error
                     }
 
                     // Check 2: Is the color array size valid (3 or 4)?
                     if (color_array_json.size() < 3 || color_array_json.size() > 4) {
-                        ErrorHandler::logError("Config: Color array for state " + std::to_string(current_state) +
-                                               " has invalid size (" + std::to_string(color_array_json.size()) + "). Must be 3 (RGB) or 4 (RGBA).", false);
+                        if (logger) logger->warn("Color array for state " + std::to_string(current_state) +
+                                               " has invalid size (" + std::to_string(color_array_json.size()) + "). Must be 3 (RGB) or 4 (RGBA).");
                         format_valid = false;
                         break; // Stop processing
                     }
@@ -282,8 +286,8 @@ bool Rule::parseStateColorMap(const nlohmann::json& j) {
                     bool components_valid = true;
                     for(const auto& comp : color_array_json) {
                         if (!comp.is_number_integer() || comp.get<int>() < 0 || comp.get<int>() > 255) {
-                             ErrorHandler::logError("Config: Invalid color component found for state " + std::to_string(current_state) +
-                                                    ". Components must be integers between 0-255.", false);
+                             if (logger) logger->info("Invalid color component found for state " + std::to_string(current_state) +
+                                                    ". Components must be integers between 0-255.");
                              components_valid = false;
                              format_valid = false;
                              break; // Stop processing components for this color
@@ -311,7 +315,7 @@ bool Rule::parseStateColorMap(const nlohmann::json& j) {
             // Assign debug colors for any remaining states from the `states_` list
             for (int s : states_) {
                 if (stateColorMap_.find(s) == stateColorMap_.end()) {
-                    ErrorHandler::logError("Config: State " + std::to_string(s) + " defined in 'states' but not covered by 'state_color_map' array. Assigning debug color.", false);
+                    if (logger) logger->warn("State " + std::to_string(s) + " defined in 'states' but not covered by 'state_color_map' array. Assigning debug color.");
                      // Use the calculated debug color part of the default logic
                      stateColorMap_[s] = Color( (s * 30) % 256, (s * 50) % 256, (s * 70) % 256, 255);
                 }
@@ -320,14 +324,14 @@ bool Rule::parseStateColorMap(const nlohmann::json& j) {
 
     } catch (const nlohmann::json::exception& e) {
         // Catch potential errors during JSON access/parsing (e.g., malformed JSON file)
-        ErrorHandler::logError("Config: JSON parsing error while accessing 'state_color_map': " + std::string(e.what()));
+        if (logger) logger->error("JSON parsing error while accessing 'state_color_map': " + std::string(e.what()));
         // Assign default colors as a safe fallback even for JSON errors
         assignDefaultColors(stateColorMap_, states_);
         // Return true because we handled it with defaults, or return false if this should be fatal
         return true; // Or consider false if a json exception should halt config loading
     } catch (const std::exception& e) {
         // Catch other potential standard exceptions
-         ErrorHandler::logError("Config: Standard error during 'state_color_map' processing: " + std::string(e.what()));
+         if (logger) logger->error("Standard error during 'state_color_map' processing: " + std::string(e.what()));
          assignDefaultColors(stateColorMap_, states_);
          return true; // Or false
     }
@@ -369,10 +373,11 @@ const std::map<int, Color>& Rule::getStateColorMap() const {
 }
 
 Color Rule::getColorForState(int state) const {
+    auto logger = Logging::GetLogger(Logging::Module::Rule);
     auto it = stateColorMap_.find(state);
     if (it != stateColorMap_.end()) {
         return it->second;
     }
-    ErrorHandler::logError("Config: Requested color for unmapped state: " + std::to_string(state) + ". Returning debug color.", false);
+    if (logger) logger->info("Requested color for unmapped state: " + std::to_string(state) + ". Returning debug color.");
     return Color(255, 0, 255, 255);
 }

@@ -1,7 +1,7 @@
 #include "snapshot_manager.h"
 #include "../ca/cell_space.h"
 #include "huffman_coding.h"
-#include "../utils/error_handler.h"
+#include "../utils/logger.h" // New logger
 #include "../utils/point.h" // For Point struct and std::hash<Point>
 
 #include <fstream>   // For file I/O (std::ofstream, std::ifstream)
@@ -21,8 +21,9 @@ void SnapshotManager::writeInt32(std::vector<std::uint8_t>& buffer, std::int32_t
 
 // Helper to read a 32-bit integer from a byte vector (little-endian)
 std::int32_t SnapshotManager::readInt32(const std::vector<std::uint8_t>& buffer, size_t& offset) const {
+    auto logger = Logging::GetLogger(Logging::Module::SnapshotManager);
     if (offset + sizeof(std::int32_t) > buffer.size()) {
-        ErrorHandler::logError("SnapshotManager: ReadInt32 - Read out of bounds.");
+        if (logger) logger->error("SnapshotManager: ReadInt32 - Read out of bounds.");
         throw std::out_of_range("ReadInt32 out of bounds");
     }
     std::int32_t value = 0;
@@ -68,6 +69,7 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
  * @brief Deserializes data into CellSpace.
  */
 bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data, CellSpace& cellSpace) const {
+    auto logger = Logging::GetLogger(Logging::Module::SnapshotManager);
     cellSpace.clear();
 
     size_t offset = 0;
@@ -92,18 +94,18 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
         }
 
         if (offset != data.size()) {
-            ErrorHandler::logError("SnapshotManager: Deserialization - Trailing data or incomplete read. Offset: " +
+            if (logger) logger->error("SnapshotManager: Deserialization - Trailing data or incomplete read. Offset: " +
                                    std::to_string(offset) + ", Data size: " + std::to_string(data.size()));
         }
 
         cellSpace.loadCells(loadedCells, minBounds, maxBounds);
 
     } catch (const std::out_of_range& e) {
-        ErrorHandler::logError("SnapshotManager: Deserialization error - " + std::string(e.what()));
+        if (logger) logger->error("SnapshotManager: Deserialization error - " + std::string(e.what()));
         cellSpace.clear();
         return false;
     } catch (...) {
-        ErrorHandler::logError("SnapshotManager: Unknown deserialization error.");
+        if (logger) logger->error("SnapshotManager: Unknown deserialization error.");
         cellSpace.clear();
         return false;
     }
@@ -116,6 +118,7 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
  * @brief Saves the CellSpace state to a file.
  */
 bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& cellSpace) {
+    auto logger = Logging::GetLogger(Logging::Module::SnapshotManager);
     std::string actualFilePath = filePath;
     if (actualFilePath.length() < 10 || actualFilePath.substr(actualFilePath.length() - 9) != ".snapshot") {
         actualFilePath += ".snapshot";
@@ -123,30 +126,30 @@ bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& ce
 
     std::vector<std::uint8_t> serialized_data = serializeCellSpace(cellSpace);
     if (serialized_data.empty() && !cellSpace.getNonDefaultCells().empty()) {
-        ErrorHandler::logError("SnapshotManager: Serialization produced empty data for non-empty cell space during save.");
+        if (logger) logger->error("SnapshotManager: Serialization produced empty data for non-empty cell space during save.");
     }
 
     std::vector<std::uint8_t> compressed_data = HuffmanCoding::compress(serialized_data);
     if (compressed_data.empty() && !serialized_data.empty()) {
-        ErrorHandler::logError("SnapshotManager: Huffman compression failed or returned empty for non-empty serialized data.");
+        if (logger) logger->error("SnapshotManager: Huffman compression failed or returned empty for non-empty serialized data.");
         return false;
     }
 
     std::ofstream outFile(actualFilePath, std::ios::binary | std::ios::trunc);
     if (!outFile.is_open()) {
-        ErrorHandler::logError("SnapshotManager: Failed to open file for saving: " + actualFilePath);
+        if (logger) logger->error("SnapshotManager: Failed to open file for saving: " + actualFilePath);
         return false;
     }
 
     outFile.write(reinterpret_cast<const char*>(compressed_data.data()), compressed_data.size());
     if (outFile.fail()) {
-        ErrorHandler::logError("SnapshotManager: Failed to write data to file: " + actualFilePath);
+        if (logger) logger->error("SnapshotManager: Failed to write data to file: " + actualFilePath);
         outFile.close();
         return false;
     }
 
     outFile.close();
-    ErrorHandler::logError("SnapshotManager: State saved successfully to " + actualFilePath, false);
+    if (logger) logger->error("SnapshotManager: State saved successfully to " + actualFilePath);
     return true;
 }
 
@@ -154,9 +157,10 @@ bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& ce
  * @brief Loads CellSpace state from a file.
  */
 bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpace) {
+    auto logger = Logging::GetLogger(Logging::Module::SnapshotManager);
     std::ifstream inFile(filePath, std::ios::binary | std::ios::ate);
     if (!inFile.is_open()) {
-        ErrorHandler::logError("SnapshotManager: Failed to open file for loading: " + filePath);
+        if (logger) logger->error("SnapshotManager: Failed to open file for loading: " + filePath);
         return false;
     }
 
@@ -164,12 +168,12 @@ bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpac
     inFile.seekg(0, std::ios::beg);
 
     if (size == 0) {
-        ErrorHandler::logError("SnapshotManager: Snapshot file is empty: " + filePath);
+        if (logger) logger->error("SnapshotManager: Snapshot file is empty: " + filePath);
     }
 
     std::vector<std::uint8_t> compressed_data(size);
     if (!inFile.read(reinterpret_cast<char*>(compressed_data.data()), size)) {
-        ErrorHandler::logError("SnapshotManager: Failed to read data from file: " + filePath);
+        if (logger) logger->error("SnapshotManager: Failed to read data from file: " + filePath);
         inFile.close();
         return false;
     }
@@ -178,15 +182,15 @@ bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpac
     std::vector<std::uint8_t> serialized_data = HuffmanCoding::decompress(compressed_data);
     if (serialized_data.empty() && !compressed_data.empty() &&
         !(compressed_data.size() == sizeof(uint64_t) && *reinterpret_cast<const uint64_t*>(compressed_data.data()) == 0) ) {
-        ErrorHandler::logError("SnapshotManager: Huffman decompression failed or returned empty for non-empty compressed data from file: " + filePath);
+        if (logger) logger->error("SnapshotManager: Huffman decompression failed or returned empty for non-empty compressed data from file: " + filePath);
         return false;
     }
 
     if (!deserializeCellSpace(serialized_data, cellSpace)) {
-        ErrorHandler::logError("SnapshotManager: Failed to deserialize cell space data from file: " + filePath);
+        if (logger) logger->error("SnapshotManager: Failed to deserialize cell space data from file: " + filePath);
         return false;
     }
 
-    ErrorHandler::logError("SnapshotManager: State loaded successfully from " + filePath, false);
+    if (logger) logger->error("SnapshotManager: State loaded successfully from " + filePath);
     return true;
 }

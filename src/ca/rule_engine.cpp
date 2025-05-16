@@ -1,7 +1,6 @@
 #include "rule_engine.h"
-#include "../utils/error_handler.h"
 #include <set>
-#include <iostream>     // For debugging messages
+#include "../utils/logger.h" // New logger
 #include <filesystem>   // For path manipulation (C++17)
 #include <unordered_map> // Make sure it's included
 
@@ -12,22 +11,21 @@ RuleEngine::RuleEngine()
       currentRuleMode_("trie"), // Default to trie
       defaultState_(0),
       initialized_(false) {
-    // ErrorHandler::logError("RuleEngine: Constructor called.", false);
 }
 
 // Destructor
 RuleEngine::~RuleEngine() {
-    // ErrorHandler::logError("RuleEngine: Destructor called. Unloading library if loaded.", false);
     unloadRuleLibrary();
 }
 
 // --- DLL Handling Methods ---
 
 bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const std::string& functionName) {
+    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
     unloadRuleLibrary();
 
     if (dllPathBaseFromConfig.empty() || functionName.empty()) {
-        ErrorHandler::logError("RuleEngine: DLL path or function name is empty. Cannot load library.", true);
+        if (logger) logger->error("DLL path or function name is empty. Cannot load library.");
         return false;
     }
 
@@ -48,7 +46,6 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
             pathAttempt2 = "lib" + filename + ".dll";
         }
 
-        // ErrorHandler::logError("RuleEngine: LoadLibraryA failed for '" + pathAttempt1 + "'. Error: " + std::to_string(GetLastError()) + ". Trying '" + pathAttempt2 + "'.", false);
         dllHandle_ = LoadLibraryA(pathAttempt2.c_str());
         if (dllHandle_) {
             actualDllPathLoaded = pathAttempt2;
@@ -58,7 +55,7 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
     }
 
     if (!dllHandle_) {
-        ErrorHandler::logError("RuleEngine: Failed to load DLL (both attempts). Last error code: " + std::to_string(GetLastError()), true);
+        if (logger) logger->error("Failed to load DLL (both attempts). Last error code: " + std::to_string(GetLastError()));
         return false;
     }
 
@@ -68,7 +65,7 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
     #pragma GCC diagnostic pop
 
     if (!dllRuleFunction_) {
-        ErrorHandler::logError("RuleEngine: Failed to find function '" + functionName + "' in DLL '" + actualDllPathLoaded + "'. Error code: " + std::to_string(GetLastError()), true);
+        if (logger) logger->error("Failed to find function '" + functionName + "' in DLL '" + actualDllPathLoaded + "'. Error code: " + std::to_string(GetLastError()));
         FreeLibrary(dllHandle_);
         dllHandle_ = nullptr;
         return false;
@@ -96,12 +93,11 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
         actualDllPathLoaded = soPath;
     } else {
         std::string dylibPath = baseNameForPosix + ".dylib";
-        // ErrorHandler::logError("RuleEngine: Failed to load .so '" + soPath + "': " + dlerror() + ". Trying .dylib '" + dylibPath + "'", false);
         dllHandle_ = dlopen(dylibPath.c_str(), RTLD_LAZY);
         if (dllHandle_) {
             actualDllPathLoaded = dylibPath;
         } else {
-             ErrorHandler::logError("RuleEngine: Failed to load .dylib '" + dylibPath + "': " + dlerror(), true);
+             if (logger) logger->error("Failed to load .dylib '" + dylibPath + "': " + dlerror());
              return false;
         }
     }
@@ -110,13 +106,12 @@ bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const
     dllRuleFunction_ = (RuleUpdateFunction)dlsym(dllHandle_, functionName.c_str());
     const char* dlsym_error = dlerror();
     if (dlsym_error) {
-        ErrorHandler::logError("RuleEngine: Failed to find function '" + functionName + "' in library '" + actualDllPathLoaded + "': " + dlsym_error, true);
+        if (logger) logger->error("Failed to find function '" + functionName + "' in library '" + actualDllPathLoaded + "': " + dlsym_error);
         dlclose(dllHandle_);
         dllHandle_ = nullptr;
         return false;
     }
 #endif
-    // ErrorHandler::logError("RuleEngine: Successfully loaded library '" + actualDllPathLoaded + "' and function '" + functionName + "'.", false);
     return true;
 }
 
@@ -129,19 +124,17 @@ void RuleEngine::unloadRuleLibrary() {
 #endif
         dllHandle_ = nullptr;
         dllRuleFunction_ = nullptr;
-        // ErrorHandler::logError("RuleEngine: DLL unloaded.", false);
     }
 }
 
-// --- Main Methods ---
 
 bool RuleEngine::initialize(const Rule& config) {
-    // ErrorHandler::logError("RuleEngine: Initializing...", false);
+    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
     initialized_ = false;
     unloadRuleLibrary();
 
     if (!config.isLoaded()) {
-        ErrorHandler::logError("RuleEngine: Cannot initialize. Configuration is not loaded.", true);
+        if (logger) logger->error("Cannot initialize. Configuration is not loaded.");
         return false;
     }
 
@@ -149,14 +142,12 @@ bool RuleEngine::initialize(const Rule& config) {
     neighborhood_ = config.getNeighborhood();
     defaultState_ = config.getDefaultState();
 
-    // ErrorHandler::logError("RuleEngine: Mode set to '" + currentRuleMode_ + "'.", false);
 
     if (currentRuleMode_ == "dll") {
         std::string dllPathFromConfig = config.getRuleDllPath();
         std::string funcName = config.getRuleFunctionName();
-        // ErrorHandler::logError("RuleEngine: Attempting to load DLL: PathBase='" + dllPathFromConfig + "', Function='" + funcName + "'.", false);
         if (!loadRuleLibrary(dllPathFromConfig, funcName)) {
-            ErrorHandler::logError("RuleEngine: Failed to initialize in DLL mode. DLL or function not loaded.", true);
+            if (logger) logger->error("Failed to initialize in DLL mode. DLL or function not loaded.");
             return false;
         }
         ruleTrie_ = Trie();
@@ -164,18 +155,14 @@ bool RuleEngine::initialize(const Rule& config) {
         ruleTrie_ = Trie();
         const auto& rules = config.getStateUpdateRules();
         if (neighborhood_.empty() && !rules.empty()) {
-            ErrorHandler::logError("RuleEngine: Trie mode - Neighborhood is empty, but rules are defined. This may lead to incorrect behavior.", true);
+            if (logger) logger->error("Trie mode - Neighborhood is empty, but rules are defined. This may lead to incorrect behavior.");
         }
         unsigned int rulesLoadedCount = 0;
         for (const auto& ruleVector : rules) {
             if (ruleVector.empty()) {
-                // ErrorHandler::logError("RuleEngine: Encountered an empty rule vector in config (Trie mode). Skipping.", false);
                 continue;
             }
             if (ruleVector.size() != (neighborhood_.size() + 1) ) {
-                // ErrorHandler::logError("RuleEngine: Rule size mismatch (Trie mode). Expected " +
-                //                        std::to_string(neighborhoodDefinition_.size() + 1) +
-                //                        " elements (neighborhood pattern + result), but got " + std::to_string(ruleVector.size()) + ". Skipping rule.", false);
                 continue;
             }
             std::vector<int> rulePrefix(ruleVector.begin(), ruleVector.end() - 1);
@@ -183,22 +170,21 @@ bool RuleEngine::initialize(const Rule& config) {
             ruleTrie_.insertRule(rulePrefix, resultState);
             rulesLoadedCount++;
         }
-        // ErrorHandler::logError("RuleEngine: Initialized in Trie mode. Rules processed/loaded into Trie: " + std::to_string(rulesLoadedCount) + "/" + std::to_string(rules.size()), false);
     } else {
-        ErrorHandler::logError("RuleEngine: Unknown rule mode: '" + currentRuleMode_ + "'. Cannot initialize rules.", true);
+        if (logger) logger->error("Unknown rule mode: '" + currentRuleMode_ + "'. Cannot initialize rules.");
         return false;
     }
 
     initialized_ = true;
-    // ErrorHandler::logError("RuleEngine: Initialization successful.", false);
     return true;
 }
 
 std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& currentCellSpace) const {
-    std::unordered_map<Point, int> cellsToUpdate; // Changed from std::vector<std::pair<Point, int>>
+    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
+    std::unordered_map<Point, int> cellsToUpdate;
 
     if (!initialized_) {
-        ErrorHandler::logError("RuleEngine: Cannot calculate next generation. Not initialized.", true);
+        if (logger) logger->error("Cannot calculate next generation. Not initialized.");
         return cellsToUpdate; // Return empty map
     }
 
@@ -215,18 +201,13 @@ std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& c
                 const int* ns_data = neighborStatesPattern.empty() ? nullptr : neighborStatesPattern.data();
                 nextState = dllRuleFunction_(ns_data);
             } else {
-                ErrorHandler::logError("RuleEngine: DLL function pointer is null in calculateNextGeneration. Cell state will persist.", true);
+                if (logger) logger->error("DLL function pointer is null in calculateNextGeneration. Cell state will persist.");
             }
         } else if (currentRuleMode_ == "trie") {
             int nextStateFromRule = ruleTrie_.findNextState(neighborStatesPattern);
 
             if (nextStateFromRule != NO_RULE_FOUND) {
                 nextState = nextStateFromRule;
-            } else {
-                // If no specific rule is found, the problem description implies the cell state persists.
-                // However, some CAs might have a default "decay" or change rule if no other rule matches.
-                // For now, assume persistence if no rule matches.
-                nextState = currentCellState; // Or apply a default rule if specified by CA type
             }
         }
 

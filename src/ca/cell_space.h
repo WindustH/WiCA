@@ -6,7 +6,6 @@
 #include <unordered_set>
 #include "../utils/point.h"
 #include <limits>
-
 /**
  * @class CellSpace
  * @brief Manages the 2D grid of cells for the cellular automaton.

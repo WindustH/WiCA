@@ -1,8 +1,8 @@
 #include "application.h"
-#include "../utils/error_handler.h"
 #include <SDL_image.h>
 #include <SDL_ttf.h>
-#include <iostream>
+#include "../utils/logger.h" // New logger
+#include "../utils/error_handler.h"
 #include <algorithm>
 #include <limits>
 #include <filesystem> // For checking file existence
@@ -34,7 +34,6 @@ Application::Application()
       userMessageIsMultiLine_(false),
       showBrushInfo_(true)
        {
-        std::cout << "[DEBUG] Application Constructor: Initial cellSpace defaultState = 0, currentBrushState = 1, simulationLag_ = 0" << std::endl;
 }
 
 // Destructor
@@ -46,16 +45,18 @@ Application::~Application() {
 // --- Initialization and Cleanup ---
 
 bool Application::initializeSDL() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
-        ErrorHandler::sdlError("Application: SDL_Init failed", true);
+        ErrorHandler::failure("SDL_Init failed.");
         return false;
     }
 
     int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
     if (!(IMG_Init(imgFlags) & imgFlags)) {
-        ErrorHandler::logError("Application: IMG_Init failed to initialize all requested image formats. SDL_image Error: " + std::string(IMG_GetError()), false);
+        if (logger) logger->error("IMG_Init failed to initialize all requested image formats. SDL_image Error: {}",std::string(IMG_GetError()));
     } else {
-        ErrorHandler::logError("Application: SDL_image initialized successfully.", false);
+        if (logger) logger->info("SDL_image initialized successfully");
     }
 
     window_ = SDL_CreateWindow(
@@ -67,34 +68,33 @@ bool Application::initializeSDL() {
         SDL_WINDOW_RESIZABLE
     );
     if (!window_) {
-        ErrorHandler::sdlError("Application: SDL_CreateWindow failed", true);
+        ErrorHandler::failure("SDL_CreateWindow failed");
         return false;
     }
-    ErrorHandler::logError("Application: SDL initialized (Video & Timer).", false);
+    if (logger) logger->info("SDL initialized (Video & Timer).");
     return true;
 }
 
 bool Application::initializeSubsystems(const std::string& configPath) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     currentConfigPath_ = configPath; // Store the initial config path
-    std::cout << "[DEBUG] Application::initializeSubsystems loading config: " << currentConfigPath_ << std::endl;
 
-    if (!config_.loadFromFile(currentConfigPath_)) {
-        ErrorHandler::logError("Application: CRITICAL - Failed to load configuration file: " + currentConfigPath_ + ". Using fallbacks.", true);
+    if (logger) logger->debug("initializeSubsystems loading config: {}", currentConfigPath_);
+
+    if (!rule_.loadFromFile(currentConfigPath_)) {
+
+        ErrorHandler::failure("Failed to load rule file: " + currentConfigPath_ + ". Using fallbacks.");
         // Attempt to initialize with some defaults if config load fails
-        config_ = Rule(); // Create a default/empty config
+        rule_ = Rule(); // Create a default/empty config
     } else {
         postMessageToUser("Config loaded: " + currentConfigPath_.substr(currentConfigPath_.find_last_of("/\\") + 1));
     }
 
-    int configDefaultState = config_.getDefaultState(); // Will use internal default if not loaded
-    std::vector<Point> configNeighborhood = config_.getNeighborhood();
+    int configDefaultState = rule_.getDefaultState(); // Will use internal default if not loaded
+    std::vector<Point> configNeighborhood = rule_.getNeighborhood();
     cellSpace_ = CellSpace(configDefaultState, configNeighborhood);
-    std::cout << "[DEBUG] CellSpace initialized with default state: " << configDefaultState << std::endl;
 
-    const auto& availableStates = config_.getStates();
-    std::cout << "[DEBUG] Config available states: ";
-    for(int s : availableStates) { std::cout << s << " "; }
-    std::cout << "(Default is: " << configDefaultState << ")" << std::endl;
+    const auto& availableStates = rule_.getStates();
 
     if (!availableStates.empty()) {
         currentBrushState_ = availableStates[0];
@@ -113,18 +113,18 @@ bool Application::initializeSubsystems(const std::string& configPath) {
         }
     } else {
         currentBrushState_ = (configDefaultState == 1) ? 0 : 1;
-        ErrorHandler::logError("Application: Config 'states' array is empty. Setting brush state to " + std::to_string(currentBrushState_) + " as a fallback.", false);
-    }
-    std::cout << "[DEBUG] Final initial brush state: " << currentBrushState_ << std::endl;
 
-    if (!ruleEngine_.initialize(config_)) {
-        ErrorHandler::logError("Application: Failed to initialize RuleEngine.", true);
+        if (logger) logger->info("Config 'states' array is empty. Setting brush state to {}",currentBrushState_);
+    }
+
+    if (!ruleEngine_.initialize(rule_)) {
+        ErrorHandler::failure("Failed to initialize RuleEngine.");
         return false;
     }
 
     // Renderer initialization depends on a valid window and config for colors
-    if (!renderer_.initialize(window_, config_)) { // Pass the loaded or default config
-        ErrorHandler::logError("Application: Failed to initialize Renderer.", true);
+    if (!renderer_.initialize(window_, rule_)) { // Pass the loaded or default config
+        ErrorHandler::failure("Failed to initialize Renderer.");
         return false;
     }
 
@@ -142,14 +142,15 @@ bool Application::initializeSubsystems(const std::string& configPath) {
         if (std::abs(currentActualCellSize - targetCellSize) > 1e-5f) {
              viewport_.zoomToCellSize(targetCellSize, Point(viewport_.getScreenWidth()/2, viewport_.getScreenHeight()/2));
         }
-         std::cout << "[DEBUG] No initial cells, centering view on origin with default zoom." << std::endl;
+         if (logger) logger->info("No initial cells, centering view on origin with default zoom.");
     }
 
-    ErrorHandler::logError("Application: All subsystems initialized successfully.", false);
+    if (logger) logger->info("All subsystems initialized successfully.");
     return true;
 }
 
 void Application::cleanupSDL() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (glContext_) {
         SDL_GL_DeleteContext(glContext_);
         glContext_ = nullptr;
@@ -160,12 +161,13 @@ void Application::cleanupSDL() {
     }
     IMG_Quit();
     SDL_Quit();
-    ErrorHandler::logError("Application: SDL cleaned up.", false);
+    if (logger) logger->info("SDL cleaned up.");
 }
 
 void Application::cleanupSubsystems() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     renderer_.cleanup();
-    ErrorHandler::logError("Application: Subsystems cleaned up.", false);
+    if (logger) logger->info("Subsystems cleaned up.");
 }
 
 
@@ -184,44 +186,44 @@ bool Application::initialize(const std::string& configPath) {
     return true;
 }
 
-void Application::loadConfiguration(const std::string& configPath) {
+void Application::loadRule(const std::string& configPath) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     bool wasPaused = simulationPaused_;
     if (!wasPaused) pauseSimulation();
 
-    postMessageToUser("Loading new configuration: " + configPath + "...", 0, false);
+    postMessageToUser("Loading new rule: " + configPath + "...", 0, false);
 
     Rule newConfig;
     if (!newConfig.loadFromFile(configPath)) {
-        ErrorHandler::logError("Application::loadConfiguration - CRITICAL - Failed to load new configuration file: " + configPath, true);
+        if (logger) logger->error("Failed to load new rule file: " + configPath);
         postMessageToUser("Error: Failed to load config: " + configPath.substr(configPath.find_last_of("/\\") + 1), 5000);
         if(!wasPaused && isRunning_) resumeSimulation();
         return;
     }
 
-    config_ = newConfig; // Assign new config
+    rule_ = newConfig; // Assign new config
     currentConfigPath_ = configPath; // Update current config path
 
     // Re-initialize CellSpace
-    int newDefaultState = config_.getDefaultState();
-    std::vector<Point> newNeighborhood = config_.getNeighborhood();
+    int newDefaultState = rule_.getDefaultState();
+    std::vector<Point> newNeighborhood = rule_.getNeighborhood();
     cellSpace_ = CellSpace(newDefaultState, newNeighborhood); // Creates a new CellSpace, clearing old one
-    std::cout << "[DEBUG] CellSpace re-initialized with new default state: " << newDefaultState << std::endl;
 
     // Re-initialize RuleEngine
-    if (!ruleEngine_.initialize(config_)) {
-        ErrorHandler::logError("Application::loadConfiguration - Failed to re-initialize RuleEngine with new config.", true);
+    if (!ruleEngine_.initialize(rule_)) {
+        ErrorHandler::failure("Failed to re-initialize RuleEngine with new config.");
         postMessageToUser("Error: Failed to apply new rules from config.", 5000);
         // Potentially revert to old config or stop simulation
     } else {
-        std::cout << "[DEBUG] RuleEngine re-initialized with new config." << std::endl;
+        if (logger) logger->info("RuleEngine re-initialized with new config.");
     }
 
     // Re-initialize Renderer colors
-    renderer_.reinitializeColors(config_);
-    std::cout << "[DEBUG] Renderer colors re-initialized." << std::endl;
+    renderer_.reinitializeColors(rule_);
+    if (logger) logger->info("Renderer colors re-initialized.");
 
     // Update brush state based on new config
-    const auto& availableStates = config_.getStates();
+    const auto& availableStates = rule_.getStates();
     if (!availableStates.empty()) {
         currentBrushState_ = availableStates[0];
         if (currentBrushState_ == newDefaultState) {
@@ -238,7 +240,7 @@ void Application::loadConfiguration(const std::string& configPath) {
     } else {
         currentBrushState_ = (newDefaultState == 1) ? 0 : 1;
     }
-    std::cout << "[DEBUG] Brush state updated for new config: " << currentBrushState_ << std::endl;
+    if (logger) logger->info("Brush state updated for new config: ", currentBrushState_);
 
     // Reset view
     if (viewport_.isAutoFitEnabled()) {
@@ -247,7 +249,7 @@ void Application::loadConfiguration(const std::string& configPath) {
         centerViewOnGrid(); // Center on (potentially empty) grid
     }
 
-    postMessageToUser("Configuration loaded: " + configPath.substr(configPath.find_last_of("/\\") + 1), 3000);
+    postMessageToUser("Rule loaded: " + configPath.substr(configPath.find_last_of("/\\") + 1), 3000);
     simulationLag_ = 0; // Reset simulation lag
 
     if (!wasPaused && isRunning_) resumeSimulation();
@@ -319,54 +321,59 @@ void Application::renderScene() {
 
 
 void Application::quit() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     isRunning_ = false;
-    ErrorHandler::logError("Application: Quit signal received.", false);
+    if (logger) logger->info("Quit signal received.");
 }
 
 void Application::togglePause() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     simulationPaused_ = !simulationPaused_;
     if (simulationPaused_) {
         postMessageToUser("Simulation Paused.");
         simulationLag_ = 0;
-        ErrorHandler::logError("Application: Simulation paused.", false);
+        if (logger) logger->info("Simulation paused.");
     } else {
         lastUpdateTime_ = SDL_GetTicks();
         simulationLag_ = 0;
         postMessageToUser("Simulation Resumed.");
-        ErrorHandler::logError("Application: Simulation resumed.", false);
+        if (logger) logger->info("Simulation resumed.");
     }
 }
 void Application::pauseSimulation() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (!simulationPaused_) {
         simulationPaused_ = true;
         simulationLag_ = 0;
         postMessageToUser("Simulation Paused.");
-        ErrorHandler::logError("Application: Simulation paused by command.", false);
+        if (logger) logger->info("Simulation paused by command.");
     }
 }
 void Application::resumeSimulation() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (simulationPaused_) {
         simulationPaused_ = false;
         lastUpdateTime_ = SDL_GetTicks();
         simulationLag_ = 0;
         postMessageToUser("Simulation Resumed.");
-        ErrorHandler::logError("Application: Simulation resumed by command.", false);
+        if (logger) logger->info("Simulation resumed by command.");
     }
 }
 
 
 void Application::setBrushState(int state) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     bool isValidState = false;
-    const auto& availableStates = config_.getStates();
+    const auto& availableStates = rule_.getStates();
 
-    if (config_.isLoaded() && !availableStates.empty()) {
+    if (rule_.isLoaded() && !availableStates.empty()) {
         for (int validState : availableStates) {
             if (state == validState) {
                 isValidState = true;
                 break;
             }
         }
-    } else if (!config_.isLoaded()) {
+    } else if (!rule_.isLoaded()) {
         if (state == 0 || state == 1) isValidState = true;
     }
 
@@ -375,7 +382,7 @@ void Application::setBrushState(int state) {
         currentBrushState_ = state;
         postMessageToUser("Brush state: " + std::to_string(state));
     } else {
-        ErrorHandler::logError("Application: Attempted to set invalid brush state " + std::to_string(state), false);
+        if (logger) logger->warn("Attempted to set invalid brush state {}", std::to_string(state));
         std::string validStatesStr = "Valid states: ";
         if (availableStates.empty()) validStatesStr += "(none defined in config or config load failed)";
         for(size_t i=0; i<availableStates.size(); ++i) {validStatesStr += std::to_string(availableStates[i]) + (i < availableStates.size()-1 ? ", " : "");}
@@ -384,12 +391,13 @@ void Application::setBrushState(int state) {
 }
 
 void Application::setBrushSize(int size) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (size >= 1 && size <= 50) {
         currentBrushSize_ = size;
-        ErrorHandler::logError("Application: Brush size set to " + std::to_string(size), false);
+        if (logger) logger->info("Brush size set to {}", std::to_string(size));
         postMessageToUser("Brush size: " + std::to_string(size));
     } else {
-        ErrorHandler::logError("Application: Invalid brush size " + std::to_string(size) + ". Must be >= 1 and <=50.", false);
+        if (logger) logger->warn("Invalid brush size {}. Must be >= 1 and <=50.", std::to_string(size));
         postMessageToUser("Error: Brush size must be 1-50.");
     }
 }
@@ -409,15 +417,16 @@ void Application::applyBrush(Point worldPos, CellSpace& cs) {
 
 
 void Application::toggleCommandInput() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     commandInputActive_ = !commandInputActive_;
     if (commandInputActive_) {
         commandInputBuffer_.clear();
         SDL_StartTextInput();
-        ErrorHandler::logError("Application: Command input activated.", false);
+        if (logger) logger->info("Command input activated.");
         postMessageToUser("Command input ON. Press '/' or Esc to close.", 2000);
     } else {
         SDL_StopTextInput();
-        ErrorHandler::logError("Application: Command input deactivated.", false);
+        if (logger) logger->info("Command input deactivated.");
     }
 }
 
@@ -438,6 +447,7 @@ void Application::appendCommandText(const std::string& text, bool isBackspace) {
 }
 
 void Application::executeCommand() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (!commandInputActive_ || commandInputBuffer_.empty()) {
         if (commandInputActive_) toggleCommandInput();
         return;
@@ -454,7 +464,7 @@ void Application::executeCommand() {
         return;
     }
 
-    ErrorHandler::logError("Application: Executing command: " + commandToExecute, false);
+    if (logger) logger->info("Executing command: {}", commandToExecute);
 
     bool commandRecognized = commandParser_.parseAndExecute(commandToExecute, cellSpace_, viewport_, snapshotManager_);
 
@@ -465,20 +475,22 @@ void Application::executeCommand() {
 }
 
 void Application::setAppFontSize(int size) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (size > 0 && size < 100) {
         if (renderer_.setFontSize(size)) {
             postMessageToUser("Font size set to " + std::to_string(size));
-            ErrorHandler::logError("Application: Font size set to " + std::to_string(size), false);
+            if (logger) logger->info("Font size set to {}", std::to_string(size));
         } else {
             postMessageToUser("Error: Could not apply font size " + std::to_string(size) + ". Check logs.");
         }
     } else {
         postMessageToUser("Error: Invalid font size " + std::to_string(size) + ". Must be >0 and <100.", 3000);
-        ErrorHandler::logError("Application: Invalid font size requested: " + std::to_string(size), false);
+        if (logger) logger->warn("Invalid font size requested: ", std::to_string(size));
     }
 }
 
 void Application::setAppFontPath(const std::string& path) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (path.empty()) {
         postMessageToUser("Error: Font path cannot be empty.");
         return;
@@ -487,7 +499,7 @@ void Application::setAppFontPath(const std::string& path) {
 
     if (renderer_.setFontPath(path, fontSizeToUse)) {
         postMessageToUser("Font set to: " + path.substr(path.find_last_of("/\\") + 1));
-        ErrorHandler::logError("Application: Font set to path: " + path, false);
+        if (logger) logger->info("Font set to path: {}", path);
     } else {
         postMessageToUser("Error: Could not load font from path: " + path);
     }
@@ -546,17 +558,19 @@ bool Application::isViewportAutoFitEnabled() const {
 
 
 void Application::setAutoFitView(bool enabled) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     viewport_.setAutoFit(enabled, cellSpace_);
     if (enabled) {
-        ErrorHandler::logError("Application: Autofit enabled.", false);
+        if (logger) logger->info("Autofit enabled.");
         postMessageToUser("Autofit ON.");
     } else {
-        ErrorHandler::logError("Application: Autofit disabled.", false);
+        if (logger) logger->info("Autofit disabled.");
         postMessageToUser("Autofit OFF.");
     }
 }
 
 void Application::centerViewOnGrid() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (cellSpace_.areBoundsInitialized() && !cellSpace_.getNonDefaultCells().empty()) {
         Point minB = cellSpace_.getMinBounds();
         Point maxB = cellSpace_.getMaxBounds();
@@ -565,31 +579,33 @@ void Application::centerViewOnGrid() {
             static_cast<float>(minB.y) + static_cast<float>(maxB.y - minB.y +1) / 2.0f
         );
         viewport_.setCenter(center);
-        ErrorHandler::logError("Application: View centered on grid.", false);
+        if (logger) logger->info("View centered on grid.");
         postMessageToUser("View centered.");
     } else {
         viewport_.setCenter({0.0f, 0.0f});
-        ErrorHandler::logError("Application: Grid empty or no bounds, view centered on origin.", false);
+        if (logger) logger->info("Grid empty or no bounds, view centered on origin.");
         postMessageToUser("Grid is empty. Centered on origin (0,0).");
     }
 }
 
 void Application::saveSnapshot(const std::string& filename) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (snapshotManager_.saveState(filename, cellSpace_)) {
-        ErrorHandler::logError("Application: Snapshot saved to " + filename, false);
+        if (logger) logger->info("Snapshot saved to {}",filename);
         postMessageToUser("Snapshot saved: " + filename);
     } else {
-        ErrorHandler::logError("Application: Failed to save snapshot to " + filename, true);
+        if (logger) logger->error("Failed to save snapshot to " + filename);
         postMessageToUser("Error: Failed to save snapshot " + filename);
     }
 }
 
 void Application::loadSnapshot(const std::string& filename) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     bool wasPaused = simulationPaused_;
     if(!wasPaused) pauseSimulation();
 
     if (snapshotManager_.loadState(filename, cellSpace_)) {
-        ErrorHandler::logError("Application: Snapshot loaded from " + filename, false);
+        if (logger) logger->info("Snapshot loaded from {}", filename);
         postMessageToUser("Snapshot loaded: " + filename);
         if (viewport_.isAutoFitEnabled()) {
             viewport_.updateAutoFit(cellSpace_);
@@ -597,7 +613,7 @@ void Application::loadSnapshot(const std::string& filename) {
             centerViewOnGrid();
         }
     } else {
-        ErrorHandler::logError("Application: Failed to load snapshot from " + filename, true);
+        if (logger) logger->error("Failed to load snapshot from " + filename);
         postMessageToUser("Error: Failed to load snapshot " + filename);
     }
 
@@ -605,6 +621,7 @@ void Application::loadSnapshot(const std::string& filename) {
 }
 
 void Application::clearSimulation() {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     bool wasPaused = simulationPaused_;
     if(!wasPaused) pauseSimulation();
 
@@ -618,18 +635,19 @@ void Application::clearSimulation() {
          viewport_.zoomToCellSize(defaultCellSize, Point(viewport_.getScreenWidth()/2, viewport_.getScreenHeight()/2));
     }
     postMessageToUser("Grid cleared.");
-    ErrorHandler::logError("Application: Simulation grid cleared.", false);
+    if (logger) logger->info("Simulation grid cleared.");
 
     if (!wasPaused && isRunning_) resumeSimulation();
 }
 
 void Application::setSimulationSpeed(float updatesPerSecond) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (updatesPerSecond <= 0.0f) {
         simulationSpeed_ = 0.1f;
-        ErrorHandler::logError("Application: Invalid speed. Setting to minimum " + std::to_string(simulationSpeed_) + " UPS.", false);
+        if (logger) logger->info("Invalid speed. Setting to minimum {} UPS.", std::to_string(simulationSpeed_));
     } else if (updatesPerSecond > 200.0f) {
         simulationSpeed_ = 200.0f;
-         ErrorHandler::logError("Application: Speed too high. Setting to maximum " + std::to_string(simulationSpeed_) + " UPS.", false);
+         if (logger) logger->info("Speed too high. Setting to maximum {} UPS.", std::to_string(simulationSpeed_));
     }
     else {
         simulationSpeed_ = updatesPerSecond;
@@ -643,15 +661,16 @@ void Application::setSimulationSpeed(float updatesPerSecond) {
     }
 
 
-    ErrorHandler::logError("Application: Simulation speed set to " + std::to_string(simulationSpeed_) +
-                           " UPS (Time per update: " + std::to_string(timePerUpdate_) + "ms).", false);
+    if (logger) logger->info("Simulation speed set to " + std::to_string(simulationSpeed_) +
+                           " UPS (Time per update: " + std::to_string(timePerUpdate_) + "ms).");
     postMessageToUser("Speed: " + std::to_string(simulationSpeed_) + " UPS");
 }
 
 void Application::onWindowResized(int newWidth, int newHeight) {
+    auto logger = Logging::GetLogger(Logging::Module::Core);
     if (newWidth > 0 && newHeight > 0) {
         viewport_.setScreenDimensions(newWidth, newHeight, cellSpace_);
-        ErrorHandler::logError("Application: Window resized to " + std::to_string(newWidth) + "x" + std::to_string(newHeight), false);
+        if (logger) logger->info("Window resized to {}x{}", std::to_string(newWidth), std::to_string(newHeight));
     }
 }
 
@@ -663,8 +682,6 @@ void Application::postMessageToUser(const std::string& message, Uint32 durationM
     } else {
         userMessageDisplayTime_ = SDL_GetTicks() + durationMs;
     }
-
-    std::cout << "USER_MSG: " << message << (isMultiLine ? " (multi-line)" : "") << (durationMs > 0 && durationMs != (std::numeric_limits<Uint32>::max()-1) ? " for " + std::to_string(durationMs) + "ms" : " (persistent)") << std::endl;
 }
 
 int Application::getCurrentBrushState() const {

@@ -1,6 +1,7 @@
 #include "viewport.h"
 #include <algorithm> // For std::min, std::max
 #include <cmath>     // For std::floor, std::ceil, std::round, std::abs
+#include "../utils/logger.h" // New logger
 
 /**
  * @brief Constructor for Viewport.

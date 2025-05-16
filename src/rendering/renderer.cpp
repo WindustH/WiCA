@@ -1,6 +1,5 @@
 #include "renderer.h"
-#include "../utils/error_handler.h"
-#include <iostream>
+#include "../utils/logger.h" // New logger
 #include <algorithm>
 #include <sstream>
 #include <filesystem>
@@ -34,10 +33,11 @@ Renderer::~Renderer() {
 }
 
 bool Renderer::initializeTTF() {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (uiComponentsInitialized_) return true;
 
     if (TTF_Init() == -1) {
-        ErrorHandler::sdlError("Renderer: TTF_Init failed");
+        if (logger) logger->error("TTF_Init failed");
         uiComponentsInitialized_ = false;
         return false;
     }
@@ -55,8 +55,9 @@ void Renderer::cleanupTTF() {
 }
 
 bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize, bool isFullPath) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (!uiComponentsInitialized_) {
-        ErrorHandler::logError("Renderer::loadFontInternal - TTF system not initialized. Cannot load font.", true);
+        if (logger) logger->error("TTF system not initialized. Cannot load font.");
         return false;
     }
 
@@ -81,7 +82,7 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
             //  std::cout << "[DEBUG] Renderer::loadFontInternal - Asset font failed. Trying as system font: " << fontIdentifier << std::endl;
             uiFont_ = TTF_OpenFont(fontIdentifier.c_str(), fontSize);
             if (!uiFont_) {
-                ErrorHandler::logError("Renderer: TTF_OpenFont failed for '" + pathToTry + "' (and as system font '" + fontIdentifier + "'). SDL_ttf Error: " + std::string(TTF_GetError()));
+                if (logger) logger->error("TTF_OpenFont failed for '" + pathToTry + "' (and as system font '" + fontIdentifier + "'). SDL_ttf Error: " + std::string(TTF_GetError()));
                 fontLoadedSuccessfully_ = false;
                 currentFontName_ = "";
                 currentFontPath_ = "";
@@ -92,7 +93,7 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
                  currentFontName_ = fontIdentifier; // Can be the same for system fonts
             }
         } else {
-            ErrorHandler::logError("Renderer: TTF_OpenFont failed for full path '" + pathToTry + "'. SDL_ttf Error: " + std::string(TTF_GetError()));
+            if (logger) logger->error("TTF_OpenFont failed for full path '" + pathToTry + "'. SDL_ttf Error: " + std::string(TTF_GetError()));
             fontLoadedSuccessfully_ = false;
             currentFontName_ = "";
             currentFontPath_ = "";
@@ -115,14 +116,14 @@ bool Renderer::loadFontInternal(const std::string& fontIdentifier, int fontSize,
 }
 
 bool Renderer::loadDefaultFont(int fontSize) {
-    // std::cout << "[DEBUG] Renderer::loadDefaultFont with size " << fontSize << std::endl;
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     const char* defaultFontNames[] = {
         "default.ttf", // Example: "arial.ttf" or a known font in assets/fonts/
         nullptr
     };
 
     for (int i = 0; defaultFontNames[i] != nullptr; ++i) {
-        if (loadFontInternal(defaultFontNames[i], fontSize, false)) { // false for isFullPath, as it's in ASSETS_FONT_PATH
+        if (loadFontInternal(defaultFontNames[i], fontSize, false)) {
             return true;
         }
     }
@@ -133,91 +134,82 @@ bool Renderer::loadDefaultFont(int fontSize) {
         // For system fonts, the 'fontIdentifier' is the name itself, and 'isFullPath' is effectively false (or rather, it's not a relative asset path)
         // The internal logic of loadFontInternal will try it as a direct name if asset path fails.
         if (loadFontInternal(systemFontFallbacks[i], fontSize, false)) { // Treat as identifier, not full path
-            ErrorHandler::logError("Renderer: Loaded system fallback font '" + std::string(systemFontFallbacks[i]) + "' as default.", false);
+            if (logger) logger->warn("Loaded system fallback font '" + std::string(systemFontFallbacks[i]) + "' as default.");
             return true;
         }
     }
 
-    ErrorHandler::logError("Renderer: CRITICAL - Failed to load ANY default font (local or system). UI text will not be available.", true);
+    if (logger) logger->error("Failed to load ANY default font (local or system). UI text will not be available.");
     return false;
 }
 
 void Renderer::reinitializeColors(const Rule& newConfig) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     stateSdlColorMap_.clear();
-    // std::cout << "[DEBUG] Renderer::reinitializeColors - Color map cleared." << std::endl;
     if (!newConfig.isLoaded()) {
-        ErrorHandler::logError("Renderer::reinitializeColors - Provided newConfig is not loaded. Using fallback colors.");
+        if (logger) logger->error("Provided newConfig is not loaded. Using fallback colors.");
         stateSdlColorMap_[0] = convertToSdlColor(Color(255, 255, 255, 255)); // White for state 0
         stateSdlColorMap_[1] = convertToSdlColor(Color(0, 0, 0, 255));     // Black for state 1
     } else {
-        const auto& appColorMap = newConfig.getStateColorMap(); // This is std::map<int, Color>
-        // std::cout << "[DEBUG] Renderer::reinitializeColors - Loading colors from new config:" << std::endl;
+        const auto& appColorMap = newConfig.getStateColorMap(); // This is
         for (const auto& pair : appColorMap) {
             stateSdlColorMap_[pair.first] = convertToSdlColor(pair.second);
-            // std::cout << "  State " << pair.first << ": R" << (int)pair.second.r << " G" << (int)pair.second.g << " B" << (int)pair.second.b << " A" << (int)pair.second.a << std::endl;
         }
         // Ensure default state color is present
         int configDefaultState = newConfig.getDefaultState();
         if (stateSdlColorMap_.find(configDefaultState) == stateSdlColorMap_.end()){
             Color c = newConfig.getColorForState(configDefaultState); // getColorForState should provide a color
             stateSdlColorMap_[configDefaultState] = convertToSdlColor(c);
-            //  std::cout << "  Default State " << configDefaultState << " (from new config, added): R" << (int)c.r << " G" << (int)c.g << " B" << (int)c.b << " A" << (int)c.a << std::endl;
         } else {
-            //  std::cout << "  Default State " << configDefaultState << " (from new config) already in map." << std::endl;
         }
     }
-    // std::cout << "[DEBUG] Renderer stateSdlColorMap_ repopulated. Size: " << stateSdlColorMap_.size() << std::endl;
 }
 
 
 bool Renderer::initialize(SDL_Window* window, const Rule& config) {
-    // std::cout << "[DEBUG] Renderer::initialize()" << std::endl;
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (!window) {
-        ErrorHandler::logError("Renderer: Provided window is null.", true);
+        if (logger) logger->error("Provided window is null.");
         return false;
     }
     sdlWindow_ = window;
 
     sdlRenderer_ = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!sdlRenderer_) {
-        ErrorHandler::sdlError("Renderer: SDL_CreateRenderer (ACCELERATED) failed. Trying SOFTWARE fallback.");
+        if (logger) logger->error("SDL_CreateRenderer (ACCELERATED) failed. Trying SOFTWARE fallback.");
         sdlRenderer_ = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE | SDL_RENDERER_PRESENTVSYNC);
         if (!sdlRenderer_) {
-            ErrorHandler::sdlError("Renderer: SDL_CreateRenderer (SOFTWARE) also failed.");
+            if (logger) logger->error("SDL_CreateRenderer (SOFTWARE) also failed.");
             return false;
         }
     }
-    // std::cout << "[DEBUG] Renderer: SDL_CreateRenderer successful." << std::endl;
     SDL_SetRenderDrawBlendMode(sdlRenderer_, SDL_BLENDMODE_BLEND);
 
     if (!initializeTTF()) {
-        ErrorHandler::logError("Renderer: Failed to initialize TTF system. UI text might not be available.", true);
+        if (logger) logger->error(": Failed to initialize TTF system. UI text might not be available.");
         // Continue without font if TTF fails, but log it.
     } else {
         if (!loadDefaultFont(currentFontSize_)) { // currentFontSize_ is 16 by default
-             ErrorHandler::logError("Renderer: Failed to load any default font during initialization.", true);
+             if (logger) logger->error("Failed to load any default font during initialization.");
         }
     }
     reinitializeColors(config);
 
-    ErrorHandler::logError("Renderer: Initialized successfully.", false);
+    if (logger) logger->info("Initialized successfully.");
     return true;
 }
 
 bool Renderer::setFontSize(int newSize) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (newSize <= 0) {
-        ErrorHandler::logError("Renderer::setFontSize - Invalid font size: " + std::to_string(newSize), true);
+        if (logger) logger->error("Invalid font size: " + std::to_string(newSize));
         return false;
     }
     if (currentFontPath_.empty() && currentFontName_.empty()) {
-        ErrorHandler::logError("Renderer::setFontSize - No font currently loaded (path and name are empty). Cannot change size. Trying to load default font with new size.", true);
+        if (logger) logger->error("No font currently loaded (path and name are empty). Cannot change size. Trying to load default font with new size.");
         return loadDefaultFont(newSize); // Attempt to load a default with the new size
     }
 
-    // std::cout << "[DEBUG] Renderer::setFontSize - Setting font size to " << newSize << " for font: " << (currentFontPath_.empty() ? currentFontName_ : currentFontPath_) << std::endl;
-
-    // Determine if the currentFontPath_ is a full path or just an identifier (like a system font name or asset name)
-    // A simple heuristic: if it contains directory separators or is an asset path.
     bool pathIsLikelyAbsoluteOrAsset = (!currentFontPath_.empty() &&
                                        (currentFontPath_.find('/') != std::string::npos ||
                                         currentFontPath_.find('\\') != std::string::npos ||
@@ -237,41 +229,33 @@ bool Renderer::setFontSize(int newSize) {
     } else {
         // If loading with currentFontPath_ (as full path) failed, and currentFontName_ is different and might be a system font
         if (useFullPathFlag && !currentFontName_.empty() && currentFontName_ != identifierToLoad) {
-            // std::cout << "[DEBUG] Renderer::setFontSize - Reloading with currentFontPath_ failed. Trying with currentFontName_ as identifier: " << currentFontName_ << std::endl;
             if (loadFontInternal(currentFontName_, newSize, false)) { // Treat currentFontName_ as an identifier
                 return true;
             }
         }
     }
-    ErrorHandler::logError("Renderer::setFontSize - Failed to reload font '" + identifierToLoad + "' (and potentially '" + currentFontName_ + "') at new size " + std::to_string(newSize), true);
+    if (logger) logger->error("Failed to reload font '" + identifierToLoad + "' (and potentially '" + currentFontName_ + "') at new size " + std::to_string(newSize));
     return false;
 }
 
 bool Renderer::setFontPath(const std::string& fontPath, int fontSize) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (fontPath.empty()) {
-        ErrorHandler::logError("Renderer::setFontPath - Font path is empty.", true);
+        if (logger) logger->error("Font path is empty.");
         return false;
     }
     if (fontSize <= 0) {
-        ErrorHandler::logError("Renderer::setFontPath - Invalid font size: " + std::to_string(fontSize), true);
+        if (logger) logger->error("Invalid font size: " + std::to_string(fontSize));
         return false;
     }
-    // std::cout << "[DEBUG] Renderer::setFontPath - Setting font to path: " << fontPath << " with size " << fontSize << std::endl;
-    // Treat fontPath as a full path or a direct system font name.
-    // The 'true' for isFullPath in loadFontInternal means it will try fontPath as is.
-    // If that fails, loadFontInternal's internal logic will then try it as a system font name if isFullPath was false.
-    // For setFontPath, we assume user provides either a full path or a system name they want to load directly.
     if (loadFontInternal(fontPath, fontSize, true)) { // Try as full path first
         return true;
     }
-    // If loading as full path failed, try as a system/simple name (isFullPath = false)
-    // This handles cases where user passes "Arial" to setFontPath.
-    // std::cout << "[DEBUG] Renderer::setFontPath - Loading as full path failed for: " << fontPath << ". Trying as system/simple name." << std::endl;
     if (loadFontInternal(fontPath, fontSize, false)) {
         return true;
     }
 
-    ErrorHandler::logError("Renderer::setFontPath - Failed to load font from path/name: " + fontPath, true);
+    if (logger) logger->error("Failed to load font from path/name: " + fontPath);
     return false;
 }
 
@@ -280,32 +264,30 @@ void Renderer::setGridDisplayMode(GridDisplayMode mode) {
     std::string modeStr = "AUTO";
     if (mode == GridDisplayMode::ON) modeStr = "ON";
     else if (mode == GridDisplayMode::OFF) modeStr = "OFF";
-    // std::cout << "[DEBUG] Renderer: Grid display mode set to " << modeStr << std::endl;
 }
 
 void Renderer::setGridHideThreshold(int threshold) {
     if (threshold < 0) threshold = 0;
     gridHideThreshold_ = threshold;
-    // std::cout << "[DEBUG] Renderer: Grid hide threshold set to " << threshold << std::endl;
 }
 
 void Renderer::setGridLineWidth(int width) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (width < 1) {
         gridLineWidth_ = 1;
-        ErrorHandler::logError("Renderer::setGridLineWidth - Invalid width " + std::to_string(width) + ". Setting to 1px.", false);
+        if (logger) logger->error("Invalid width " + std::to_string(width) + ". Setting to 1px.");
     } else {
         gridLineWidth_ = width;
     }
-    // std::cout << "[DEBUG] Renderer: Grid line width set to " << gridLineWidth_ << "px." << std::endl;
 }
 
 void Renderer::setGridLineColor(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
     gridLineColor_ = {r, g, b, a};
-    // std::cout << "[DEBUG] Renderer: Grid line color set to R" << (int)r << " G" << (int)g << " B" << (int)b << " A" << (int)a << std::endl;
 }
 
 
 void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (!sdlRenderer_) return;
 
     SDL_Color backgroundColor = {220, 220, 220, 255}; // Default background
@@ -315,7 +297,7 @@ void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) 
         backgroundColor = it_default_color->second;
     } else {
         // Fallback if default state's color isn't in map for some reason
-        ErrorHandler::logError("Renderer::renderGrid - Default state " + std::to_string(defaultStateVal) + " color not found in map. Using fallback background.", false);
+        if (logger) logger->info("Default state " + std::to_string(defaultStateVal) + " color not found in map. Using fallback background.");
     }
 
     SDL_SetRenderDrawColor(sdlRenderer_, backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
@@ -383,7 +365,7 @@ void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) 
                 // Log this missing state color once to avoid spamming logs
                 static std::unordered_map<int, bool> loggedMissingColors;
                 if (loggedMissingColors.find(state) == loggedMissingColors.end()) {
-                    ErrorHandler::logError("Renderer::renderGrid - Color for state " + std::to_string(state) + " not found. Using fallback magenta.", false);
+                    if (logger) logger->warn("Color for state " + std::to_string(state) + " not found. Using fallback magenta.");
                     loggedMissingColors[state] = true;
                 }
             }
@@ -429,6 +411,7 @@ void Renderer::renderGrid(const CellSpace& cellSpace, const Viewport& viewport) 
 }
 
 void Renderer::renderMultiLineText(const std::string& text, int x, int y, SDL_Color color, int maxWidth, int& outHeight) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     outHeight = 0;
     if (!isUiReady() || text.empty()) {
         return;
@@ -453,13 +436,13 @@ void Renderer::renderMultiLineText(const std::string& text, int x, int y, SDL_Co
                 currentY += surface->h;
                 outHeight += surface->h;
             } else {
-                 ErrorHandler::logError("Renderer: SDL_CreateTextureFromSurface failed for multi-line: " + std::string(SDL_GetError()), true);
+                 if (logger) logger->error("SDL_CreateTextureFromSurface failed for multi-line: " + std::string(SDL_GetError()));
                  currentY += fontLineSkip; // Fallback line skip
                  outHeight += fontLineSkip;
             }
             SDL_FreeSurface(surface);
         } else {
-            ErrorHandler::logError("Renderer: TTF_RenderText_Blended_Wrapped failed for multi-line: '" + line + "' Error: " + TTF_GetError(), true);
+            if (logger) logger->error("TTF_RenderText_Blended_Wrapped failed for multi-line: '" + line + "' Error: " + TTF_GetError());
             currentY += fontLineSkip; // Fallback line skip
             outHeight += fontLineSkip;
         }
@@ -478,15 +461,16 @@ void Renderer::renderMultiLineText(const std::string& text, int x, int y, SDL_Co
 void Renderer::renderUI(const std::string& commandText, bool showCommandInput,
                         const std::string& userMessage, const std::string& brushInfo,
                         const Viewport& viewport) {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (!sdlRenderer_) return;
 
     if (!isUiReady()) {
         static bool uiErrorLogged = false; // Log only once per session run
         if(!uiErrorLogged) {
            if(!fontLoadedSuccessfully_) {
-               ErrorHandler::logError("Renderer::renderUI - UI Font not available (fontLoadedSuccessfully_ is false), cannot render text elements.", true);
+               if (logger) logger->error("UI Font not available (fontLoadedSuccessfully_ is false), cannot render text elements.");
            } else if (!uiFont_) { // uiFont_ is nullptr despite fontLoadedSuccessfully_ being true
-               ErrorHandler::logError("Renderer::renderUI - UI Font pointer is null despite successful load flag. Cannot render text.", true);
+               if (logger) logger->error("UI Font pointer is null despite successful load flag. Cannot render text.");
            }
            uiErrorLogged = true;
         }
@@ -565,14 +549,14 @@ void Renderer::renderUI(const std::string& commandText, bool showCommandInput,
 
         SDL_Surface* textSurface = TTF_RenderText_Blended_Wrapped(uiFont_, fullCommandText.c_str(), uiTextColor_, static_cast<Uint32>(screenW - (2*UIMargin) - (2*textPadding)));
         if (!textSurface) {
-            ErrorHandler::logError("Renderer: TTF_RenderText_Blended_Wrapped failed for command input: " + std::string(TTF_GetError()), true);
+            if (logger) logger->error("TTF_RenderText_Blended_Wrapped failed for command input: " + std::string(TTF_GetError()));
         } else {
             cmdTextWidth = textSurface->w;
             cmdTextHeight = textSurface->h;
 
             SDL_Texture* textTexture = SDL_CreateTextureFromSurface(sdlRenderer_, textSurface);
             if (!textTexture) {
-                ErrorHandler::logError("Renderer: SDL_CreateTextureFromSurface failed for command input: " + std::string(SDL_GetError()), true);
+                if (logger) logger->error("SDL_CreateTextureFromSurface failed for command input: " + std::string(SDL_GetError()));
             } else {
                 int cmdBoxContentHeight = cmdTextHeight;
                 int cmdBoxHeight = cmdBoxContentHeight + (2 * textPadding);
@@ -601,10 +585,11 @@ void Renderer::renderUI(const std::string& commandText, bool showCommandInput,
 }
 
 void Renderer::presentScreen() {
+    auto logger = Logging::GetLogger(Logging::Module::Renderer);
     if (sdlRenderer_) {
         SDL_RenderPresent(sdlRenderer_);
     } else {
-        ErrorHandler::logError("Renderer::presentScreen - sdlRenderer_ is null, cannot present.", true);
+        if (logger) logger->error("sdlRenderer_ is null, cannot present.");
     }
 }
 

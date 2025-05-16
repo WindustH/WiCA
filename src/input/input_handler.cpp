@@ -4,8 +4,6 @@
 #include "../rendering/viewport.h"
 #include "../utils/error_handler.h"
 #include <cstring> // For strlen in SDL_TEXTINPUT handling
-#include <iostream> // For std::cout debugging
-
 /**
  * @brief Constructor for InputHandler.
  * @param app Reference to the main Application object.

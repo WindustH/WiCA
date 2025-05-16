@@ -4,7 +4,6 @@
 #include <map>
 #include <vector>
 #include <string> // Included for potential debugging, not strictly necessary for core logic
-#include <iostream> // Included for potential debugging
 
 // Constant to indicate no rule was found or an invalid state for lookup
 constexpr int NO_RULE_FOUND = -1; // Or some other sentinel value relevant to your state definitions

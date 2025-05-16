@@ -36,6 +36,8 @@ find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 
 # Define project root for clarity
 set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
@@ -54,6 +56,7 @@ set(PROJECT_SOURCES
     ${PROJECT_ROOT}/src/file_io/huffman_coding.cpp
     ${PROJECT_ROOT}/src/utils/error_handler.cpp
     ${PROJECT_ROOT}/src/utils/trie.cpp
+    ${PROJECT_ROOT}/src/utils/logger.cpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
@@ -84,6 +87,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL2_image::SDL2_image
     SDL2_ttf::SDL2_ttf
     nlohmann_json::nlohmann_json
+    fmt::fmt
+    spdlog::spdlog
 )
 
 # --- Plugin Compilation ---

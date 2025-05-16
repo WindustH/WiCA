@@ -3,6 +3,8 @@
 
 #include <functional> // Required for std::hash
 #include <cstddef>    // Required for std::size_t
+#include <fmt/core.h>
+
 
 // Defines a simple 2D point/vector structure for coordinates.
 struct Point {
@@ -54,5 +56,17 @@ namespace std {
         }
     };
 }
+
+template<>
+struct fmt::formatter<Point> {
+    constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin()) {
+        return ctx.begin();
+    }
+
+    template<typename FormatContext>
+    auto format(const Point& obj, FormatContext& ctx) -> decltype(ctx.out()) {
+        return fmt::format_to(ctx.out(), "Point(x={}, y={})", obj.x, obj.y);
+    }
+};
 
 #endif // POINT_H

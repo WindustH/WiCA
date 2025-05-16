@@ -3,10 +3,9 @@
 #include "../ca/cell_space.h"
 #include "../rendering/viewport.h"
 #include "../file_io/snapshot_manager.h"
-#include "../utils/error_handler.h"
+#include "../utils/logger.h" // New logger
 
 #include <algorithm>
-#include <iostream>
 #include <vector> // Required for std::vector
 #include <string> // Required for std::string, std::stoi, std::stof
 #include <stdexcept> // Required for std::invalid_argument, std::out_of_range
@@ -112,7 +111,7 @@ bool CommandParser::parseAndExecute(const std::string& commandString,
     } else if (command == "load-rule") { // New command
         if (tokens.size() >= 2) {
             std::string configPath = joinTokens(tokens, 1, tokens.size());
-            application_.loadConfiguration(configPath);
+            application_.loadRule(configPath);
         } else {
             application_.postMessageToUser("Usage: load-rule <filepath>");
         }
@@ -275,8 +274,8 @@ bool CommandParser::parseAndExecute(const std::string& commandString,
         application_.quit();
         return true;
     }
-
-    ErrorHandler::logError("CommandParser: Unknown command: " + commandString);
+    auto logger = Logging::GetLogger(Logging::Module::CommandParser);
+    if (logger) logger->error("Unknown command: " + commandString);
     application_.postMessageToUser("Unknown command: " + tokens[0] + ". Type 'help'.");
     return false;
 }

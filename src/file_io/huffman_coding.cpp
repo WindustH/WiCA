@@ -1,5 +1,5 @@
 #include "huffman_coding.h"
-#include "../utils/error_handler.h" // For logging errors
+#include "../utils/logger.h" // New logger
 #include <algorithm> // For std::sort, std::copy
 #include <iterator>  // For std::back_inserter
 
@@ -122,10 +122,9 @@ namespace HuffmanCoding {
 
     // --- Compression Main Function ---
     std::vector<std::uint8_t> compress(const std::vector<std::uint8_t>& dataToCompress) {
+        auto logger = Logging::GetLogger(Logging::Module::Huffman);
         if (dataToCompress.empty()) {
-            ErrorHandler::logError("HuffmanCoding: Cannot compress empty data.", false);
-            // Return a minimal representation for empty data if needed, or just empty.
-            // For now, let's store original size = 0.
+            if (logger) logger->error("Cannot compress empty data.");
             std::vector<std::uint8_t> compressedOutput;
             std::uint64_t originalSize = 0;
             for (size_t i = 0; i < sizeof(std::uint64_t); ++i) {
@@ -137,7 +136,7 @@ namespace HuffmanCoding {
         std::map<std::uint8_t, unsigned> freqTable = buildFrequencyTable(dataToCompress);
         HuffmanNode* treeRoot = buildHuffmanTree(freqTable);
         if (!treeRoot) { // Should not happen if dataToCompress is not empty
-             ErrorHandler::logError("HuffmanCoding: Failed to build Huffman tree for non-empty data.");
+             if (logger) logger->error("Failed to build Huffman tree for non-empty data.");
              deleteHuffmanTree(treeRoot); // Clean up if partially built
              return {}; // Return empty on failure
         }
@@ -186,7 +185,7 @@ namespace HuffmanCoding {
                  encodedString += it->second;
             } else {
                 // This should not happen if the huffmanCodes map is built correctly from all bytes in data
-                ErrorHandler::logError("HuffmanCoding: Compress - No Huffman code found for byte: " + std::to_string(byte));
+                if (logger) logger->error("Compress - No Huffman code found for byte: " + std::to_string(byte));
                 // Potentially throw an error or handle gracefully
                 deleteHuffmanTree(treeRoot);
                 return {}; // Error
@@ -223,8 +222,9 @@ namespace HuffmanCoding {
 
     // --- Decompression Main Function ---
     std::vector<std::uint8_t> decompress(const std::vector<std::uint8_t>& compressedData) {
+        auto logger = Logging::GetLogger(Logging::Module::Huffman);
         if (compressedData.size() < sizeof(std::uint64_t) + sizeof(std::uint32_t) + 1) { // Min size: original_size + freq_table_size + padding_info
-            ErrorHandler::logError("HuffmanCoding: Compressed data is too short to be valid.");
+            if (logger) logger->error("Compressed data is too short to be valid.");
             return {};
         }
 
@@ -240,7 +240,7 @@ namespace HuffmanCoding {
         if (originalSize == 0) { // Handle empty original data case
              if (compressedData.size() == sizeof(std::uint64_t)) return {}; // Correctly empty
              else {
-                 ErrorHandler::logError("HuffmanCoding: Decompress - Original size is 0 but more data exists.");
+                 if (logger) logger->error("Decompress - Original size is 0 but more data exists.");
                  return {}; // Malformed
              }
         }
@@ -249,7 +249,7 @@ namespace HuffmanCoding {
         // 2. Read frequency table
         std::uint32_t freqTableNumEntries = 0;
         if (currentByteIndex + sizeof(std::uint32_t) > compressedData.size()) {
-             ErrorHandler::logError("HuffmanCoding: Decompress - Not enough data for frequency table size."); return {};
+             if (logger) logger->error("Decompress - Not enough data for frequency table size."); return {};
         }
         for (size_t i = 0; i < sizeof(std::uint32_t); ++i) {
             freqTableNumEntries |= (static_cast<std::uint32_t>(compressedData[currentByteIndex++]) << (i * 8));
@@ -258,7 +258,7 @@ namespace HuffmanCoding {
         std::map<std::uint8_t, unsigned> freqTable;
         for (std::uint32_t i = 0; i < freqTableNumEntries; ++i) {
             if (currentByteIndex + 1 + sizeof(std::uint32_t) > compressedData.size()) {
-                ErrorHandler::logError("HuffmanCoding: Decompress - Not enough data for frequency table entry."); return {};
+                if (logger) logger->error("Decompress - Not enough data for frequency table entry."); return {};
             }
             std::uint8_t byte = compressedData[currentByteIndex++];
             unsigned freq = 0;
@@ -269,7 +269,7 @@ namespace HuffmanCoding {
         }
 
         if (freqTable.empty() && originalSize > 0) {
-            ErrorHandler::logError("HuffmanCoding: Decompress - Frequency table is empty but original size > 0.");
+            if (logger) logger->error("Decompress - Frequency table is empty but original size > 0.");
             return {};
         }
 
@@ -277,19 +277,19 @@ namespace HuffmanCoding {
         if (!freqTable.empty()) {
             treeRoot = buildHuffmanTree(freqTable);
             if (!treeRoot) {
-                ErrorHandler::logError("HuffmanCoding: Decompress - Failed to rebuild Huffman tree.");
+                if (logger) logger->error("Decompress - Failed to rebuild Huffman tree.");
                 deleteHuffmanTree(treeRoot); // Important to clean up if partially built
                 return {};
             }
         } else if (originalSize > 0) { // Freq table empty, but data expected.
-            ErrorHandler::logError("HuffmanCoding: Decompress - Freq table empty but original size > 0. Data inconsistent.");
+            if (logger) logger->error("Decompress - Freq table empty but original size > 0. Data inconsistent.");
             return {};
         }
 
 
         // 3. Read padded bits count
         if (currentByteIndex + 1 > compressedData.size()) {
-            ErrorHandler::logError("HuffmanCoding: Decompress - Not enough data for padded bits count.");
+            if (logger) logger->error("Decompress - Not enough data for padded bits count.");
             deleteHuffmanTree(treeRoot);
             return {};
         }
@@ -305,7 +305,7 @@ namespace HuffmanCoding {
         }
 
         if (bitString.length() < paddedBitsCount) {
-             ErrorHandler::logError("HuffmanCoding: Decompress - Bit string too short for declared padding.");
+             if (logger) logger->error("Decompress - Bit string too short for declared padding.");
              deleteHuffmanTree(treeRoot);
              return {};
         }
@@ -323,7 +323,7 @@ namespace HuffmanCoding {
             if(treeRoot->left && !treeRoot->left->left && !treeRoot->left->right) singleChar = treeRoot->left->data; // Assuming left is actual data
             else if (treeRoot->right && !treeRoot->right->left && !treeRoot->right->right) singleChar = treeRoot->right->data; // Or right
             else if (!treeRoot->left && !treeRoot->right) singleChar = treeRoot->data; // Root itself is the char
-            else { ErrorHandler::logError("HuffmanCoding: Decompress - Could not determine single char from tree."); deleteHuffmanTree(treeRoot); return {};}
+            else { if (logger) logger->error("Decompress - Could not determine single char from tree."); deleteHuffmanTree(treeRoot); return {};}
 
 
             for (std::uint64_t i = 0; i < originalSize; ++i) {
@@ -332,7 +332,7 @@ namespace HuffmanCoding {
         } else if (treeRoot) { // Normal case with multiple characters
             for (char bit : bitString) {
                 if (!currentNode) { // Should not happen in a well-formed stream/tree
-                    ErrorHandler::logError("HuffmanCoding: Decompress - Reached null node during traversal.");
+                    if (logger) logger->error("Decompress - Reached null node during traversal.");
                     deleteHuffmanTree(treeRoot);
                     return {};
                 }
@@ -343,7 +343,7 @@ namespace HuffmanCoding {
                 }
 
                 if (!currentNode) { // Path leads to nowhere
-                     ErrorHandler::logError("HuffmanCoding: Decompress - Invalid bit sequence, path leads to null.");
+                     if (logger) logger->error("Decompress - Invalid bit sequence, path leads to null.");
                      deleteHuffmanTree(treeRoot);
                      return {};
                 }
@@ -363,7 +363,7 @@ namespace HuffmanCoding {
         deleteHuffmanTree(treeRoot);
 
         if (decompressedOutput.size() != originalSize) {
-            ErrorHandler::logError("HuffmanCoding: Decompression resulted in size mismatch. Expected: " +
+            if (logger) logger->error("Decompression resulted in size mismatch. Expected: " +
                                    std::to_string(originalSize) + ", Got: " + std::to_string(decompressedOutput.size()));
             // This could be due to corrupted data or an issue in padding/EOS handling.
             return {}; // Return empty or partially decompressed data based on policy
