@@ -5,7 +5,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map> // Changed from <map>
 #include "../core/rule.h" // Required for Config
 #include "../ca/cell_space.h"
 #include "viewport.h"
@@ -26,7 +26,7 @@ class Renderer {
 private:
     SDL_Renderer* sdlRenderer_;
     SDL_Window* sdlWindow_;
-    std::map<int, SDL_Color> stateSdlColorMap_;
+    std::unordered_map<int, SDL_Color> stateSdlColorMap_; // Changed from std::map
 
     TTF_Font* uiFont_;
     SDL_Color uiTextColor_;
@@ -34,7 +34,7 @@ private:
     SDL_Color uiBrushInfoColor_;
     SDL_Color uiBackgroundColor_;
     SDL_Color gridLineColor_;
-    int gridLineWidth_; // New: Width of the grid lines in pixels
+    int gridLineWidth_;
 
     bool uiComponentsInitialized_;
     bool fontLoadedSuccessfully_;

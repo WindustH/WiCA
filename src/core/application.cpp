@@ -284,7 +284,7 @@ void Application::updateSimulation() {
     if (simulationPaused_ || !ruleEngine_.isInitialized()) {
         return;
     }
-    std::vector<std::pair<Point, int>> changes = ruleEngine_.calculateNextGeneration(cellSpace_);
+    std::unordered_map<Point, int> changes = ruleEngine_.calculateNextGeneration(cellSpace_);
     if (!changes.empty()) {
         cellSpace_.updateCells(changes);
         if (viewport_.isAutoFitEnabled()) {

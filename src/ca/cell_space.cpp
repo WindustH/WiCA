@@ -1,6 +1,7 @@
 #include "cell_space.h"
 #include <algorithm> // For std::min and std::max
 #include <iostream>  // For std::cout debugging
+#include <unordered_map> // Ensure it's included
 
 /**
  * @brief Constructor for CellSpace.
@@ -9,7 +10,7 @@
 CellSpace::CellSpace(int defState) : defaultState_(defState), boundsInitialized_(false) {
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
-    std::cout << "[DEBUG] CellSpace Constructor: DefaultState=" << defaultState_ << std::endl;
+    // std::cout << "[DEBUG] CellSpace Constructor: DefaultState=" << defaultState_ << std::endl;
 }
 
 /**
@@ -21,17 +22,11 @@ void CellSpace::updateBounds(Point coordinates) {
         minGridBounds_ = coordinates;
         maxGridBounds_ = coordinates;
         boundsInitialized_ = true;
-        // std::cout << "[DEBUG] CellSpace::updateBounds - Initialized to (" << coordinates.x << "," << coordinates.y << ")" << std::endl;
     } else {
-        bool changed = false;
-        if (coordinates.x < minGridBounds_.x) { minGridBounds_.x = coordinates.x; changed = true; }
-        if (coordinates.y < minGridBounds_.y) { minGridBounds_.y = coordinates.y; changed = true; }
-        if (coordinates.x > maxGridBounds_.x) { maxGridBounds_.x = coordinates.x; changed = true; }
-        if (coordinates.y > maxGridBounds_.y) { maxGridBounds_.y = coordinates.y; changed = true; }
-        // if (changed) {
-        //     std::cout << "[DEBUG] CellSpace::updateBounds - Updated: Min(" << minGridBounds_.x << "," << minGridBounds_.y
-        //               << ") Max(" << maxGridBounds_.x << "," << maxGridBounds_.y << ")" << std::endl;
-        // }
+        if (coordinates.x < minGridBounds_.x) { minGridBounds_.x = coordinates.x; }
+        if (coordinates.y < minGridBounds_.y) { minGridBounds_.y = coordinates.y; }
+        if (coordinates.x > maxGridBounds_.x) { maxGridBounds_.x = coordinates.x; }
+        if (coordinates.y > maxGridBounds_.y) { maxGridBounds_.y = coordinates.y; }
     }
 }
 
@@ -39,21 +34,17 @@ void CellSpace::updateBounds(Point coordinates) {
  * @brief Recalculates the entire bounding box based on current active cells.
  */
 void CellSpace::recalculateBounds() {
-    // std::cout << "[DEBUG] CellSpace::recalculateBounds called. Active cells: " << activeCells_.size() << std::endl;
-    boundsInitialized_ = false; // Reset before recalculating
+    boundsInitialized_ = false;
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
 
     if (activeCells_.empty()) {
-        // std::cout << "[DEBUG] CellSpace::recalculateBounds - No active cells, bounds remain uninitialized." << std::endl;
         return;
     }
 
     for (const auto& pair : activeCells_) {
-        updateBounds(pair.first); // updateBounds will set boundsInitialized_ to true on the first cell
+        updateBounds(pair.first);
     }
-    // std::cout << "[DEBUG] CellSpace::recalculateBounds - Finished. Min(" << minGridBounds_.x << "," << minGridBounds_.y
-    //           << ") Max(" << maxGridBounds_.x << "," << maxGridBounds_.y << ") Initialized: " << boundsInitialized_ << std::endl;
 }
 
 
@@ -76,25 +67,23 @@ int CellSpace::getCellState(Point coordinates) const {
  * @param state The new state.
  */
 void CellSpace::setCellState(Point coordinates, int state) {
-    // std::cout << "[DEBUG] CellSpace::setCellState: Coords(" << coordinates.x << "," << coordinates.y << "), NewState=" << state << ", DefaultState=" << defaultState_ << std::endl;
-    int currentState = getCellState(coordinates);
+    auto it = activeCells_.find(coordinates);
+    int currentState = (it != activeCells_.end()) ? it->second : defaultState_;
 
     if (state == defaultState_) {
-        if (currentState != defaultState_) { // Only erase if it was active
+        if (currentState != defaultState_) {
             activeCells_.erase(coordinates);
-            // std::cout << "  [CellSpace] Cell (" << coordinates.x << "," << coordinates.y << ") set to default. Removed. Active cells: " << activeCells_.size() << std::endl;
             if (activeCells_.empty()) {
                  boundsInitialized_ = false;
                  minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
                  maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
-            } else if (coordinates.x == minGridBounds_.x || coordinates.x == maxGridBounds_.x ||
-                       coordinates.y == minGridBounds_.y || coordinates.y == maxGridBounds_.y) {
+            } else if (boundsInitialized_ && (coordinates.x == minGridBounds_.x || coordinates.x == maxGridBounds_.x ||
+                       coordinates.y == minGridBounds_.y || coordinates.y == maxGridBounds_.y)) {
                  recalculateBounds();
             }
         }
-    } else { // Setting to a non-default (active) state
+    } else {
         activeCells_[coordinates] = state;
-        // std::cout << "  [CellSpace] Cell (" << coordinates.x << "," << coordinates.y << ") set to " << state << ". Added/Updated. Active cells: " << activeCells_.size() << std::endl;
         updateBounds(coordinates);
     }
 }
@@ -116,36 +105,47 @@ std::vector<int> CellSpace::getNeighborStates(Point centerCoordinates, const std
 }
 
 /**
- * @brief Applies pending state changes.
- * @param cellsToUpdate Vector of (Point, newState) pairs.
+ * @brief Applies a map of pending state changes to the grid.
+ * @param cellsToUpdate An unordered_map where keys are Point coordinates
+ * of cells to change, and values are their new integer states.
  */
-void CellSpace::updateCells(const std::vector<std::pair<Point, int>>& cellsToUpdate) {
+void CellSpace::updateCells(const std::unordered_map<Point, int>& cellsToUpdate) {
     if (cellsToUpdate.empty()) return;
-    // std::cout << "[DEBUG] CellSpace::updateCells - Updating " << cellsToUpdate.size() << " cells." << std::endl;
 
-    bool removedCellMightAffectBounds = false;
-    bool addedCell = false;
+    bool boundaryPotentiallyAffected = false;
 
-    for (const auto& cellUpdate : cellsToUpdate) {
-        const Point& coords = cellUpdate.first;
-        int newState = cellUpdate.second;
-        int currentState = getCellState(coords);
+    for (const auto& cellUpdatePair : cellsToUpdate) {
+        const Point& coords = cellUpdatePair.first;
+        int newState = cellUpdatePair.second;
 
-        if (currentState == newState) continue;
+        auto it = activeCells_.find(coords);
+        int currentState = (it != activeCells_.end()) ? it->second : defaultState_;
 
-        if (newState == defaultState_) {
-            if (activeCells_.erase(coords)) { // erase returns number of elements removed (0 or 1 for map)
-                // std::cout << "  [CellSpace Update] Cell (" << coords.x << "," << coords.y << ") set to default. Removed." << std::endl;
-                if (coords.x == minGridBounds_.x || coords.x == maxGridBounds_.x ||
-                    coords.y == minGridBounds_.y || coords.y == maxGridBounds_.y) {
-                    removedCellMightAffectBounds = true;
+        if (currentState == newState) continue; // No change needed for this cell
+
+        if (newState == defaultState_) { // Cell is becoming inactive
+            if (it != activeCells_.end()) { // Was active
+                activeCells_.erase(it);
+                if (boundsInitialized_ &&
+                    (coords.x == minGridBounds_.x || coords.x == maxGridBounds_.x ||
+                     coords.y == minGridBounds_.y || coords.y == maxGridBounds_.y)) {
+                    boundaryPotentiallyAffected = true;
                 }
             }
-        } else {
+        } else { // Cell is becoming active or changing its active state
             activeCells_[coords] = newState;
-            // std::cout << "  [CellSpace Update] Cell (" << coords.x << "," << coords.y << ") set to " << newState << ". Added/Updated." << std::endl;
-            updateBounds(coords);
-            addedCell = true; // An active cell was added/changed, bounds might have expanded.
+            updateBounds(coords); // This will also set boundsInitialized_ if it's the first active cell
+            // If a cell is added/modified, it might expand bounds or be within current bounds.
+            // If it expands, updateBounds handles it. If it's within, existing boundary cells are still valid unless removed.
+            // We set boundaryPotentiallyAffected to true here as well, because if a new active cell
+            // is placed *on* an existing boundary, and a *different* boundary cell was removed,
+            // a simple check for removed boundary cells might not be enough.
+            // A safer approach is to mark true if any change happens that might touch boundaries.
+            if (boundsInitialized_ &&
+                (coords.x <= minGridBounds_.x || coords.x >= maxGridBounds_.x ||
+                 coords.y <= minGridBounds_.y || coords.y >= maxGridBounds_.y)) {
+                 boundaryPotentiallyAffected = true; // If change is at or beyond current bounds
+            }
         }
     }
 
@@ -153,40 +153,31 @@ void CellSpace::updateCells(const std::vector<std::pair<Point, int>>& cellsToUpd
         boundsInitialized_ = false;
         minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
         maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
-        // std::cout << "[DEBUG] CellSpace::updateCells - All cells cleared, bounds reset." << std::endl;
-    } else if (removedCellMightAffectBounds && !addedCell) {
-        // If only removals happened and one of them was a boundary cell, recalculate.
-        // If additions also happened, updateBounds would have handled expansions.
-        // This logic is to catch shrinking bounds correctly.
+    } else if (boundaryPotentiallyAffected) {
+        // If any operation (addition or removal) could have affected the boundary,
+        // it's safest to recalculate. UpdateBounds only expands.
         recalculateBounds();
     }
-    // std::cout << "[DEBUG] CellSpace::updateCells - Finished. Active cells: " << activeCells_.size() << ". Bounds Initialized: " << boundsInitialized_ << std::endl;
 }
 
 
-const std::map<Point, int>& CellSpace::getActiveCells() const {
+const std::unordered_map<Point, int>& CellSpace::getActiveCells() const {
     return activeCells_;
 }
 
-void CellSpace::loadActiveCells(const std::map<Point, int>& cells, Point minB, Point maxB) {
+void CellSpace::loadActiveCells(const std::unordered_map<Point, int>& cells, Point minB, Point maxB) {
     activeCells_ = cells;
-    std::cout << "[DEBUG] CellSpace::loadActiveCells - Loaded " << activeCells_.size() << " cells." << std::endl;
     if (activeCells_.empty()) {
         boundsInitialized_ = false;
         minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
         maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
     } else {
-        // Trust the bounds from the snapshot if they are provided and seem valid.
-        // For robustness, one might validate or always recalculate.
-        // For now, assume minB and maxB from snapshot are correct if cells is not empty.
         minGridBounds_ = minB;
         maxGridBounds_ = maxB;
         boundsInitialized_ = true;
-        // Alternatively, to be absolutely sure:
+        // For absolute certainty, especially if minB/maxB from file could be unreliable for the given cells:
         // recalculateBounds();
     }
-     std::cout << "  [CellSpace Load] Min(" << minGridBounds_.x << "," << minGridBounds_.y
-              << ") Max(" << maxGridBounds_.x << "," << maxGridBounds_.y << ") Initialized: " << boundsInitialized_ << std::endl;
 }
 
 Point CellSpace::getMinBounds() const {
@@ -212,7 +203,6 @@ void CellSpace::clear() {
     boundsInitialized_ = false;
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     maxGridBounds_ = Point(std::numeric_limits<int>::min(), std::numeric_limits<int>::min());
-    std::cout << "[DEBUG] CellSpace::clear - All cells cleared, bounds reset." << std::endl;
 }
 
 int CellSpace::getDefaultState() const {

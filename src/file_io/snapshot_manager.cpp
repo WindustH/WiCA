@@ -2,10 +2,11 @@
 #include "../ca/cell_space.h"
 #include "huffman_coding.h"
 #include "../utils/error_handler.h"
-#include "../utils/point.h" // For Point struct used in CellSpace
+#include "../utils/point.h" // For Point struct and std::hash<Point>
 
 #include <fstream>   // For file I/O (std::ofstream, std::ifstream)
 #include <iterator>  // For std::istreambuf_iterator
+#include <unordered_map> // Required for std::unordered_map
 
 // Constructor
 SnapshotManager::SnapshotManager() {}
@@ -43,17 +44,14 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
     Point maxBounds = cellSpace.getMaxBounds();
     bool boundsValid = cellSpace.areBoundsInitialized();
 
-    // If bounds are not valid (e.g. empty grid), store some default/marker values.
-    // For simplicity, we'll store them anyway; loadActiveCells can handle empty maps.
     writeInt32(serializedData, boundsValid ? minBounds.x : 0);
     writeInt32(serializedData, boundsValid ? minBounds.y : 0);
     writeInt32(serializedData, boundsValid ? maxBounds.x : 0);
     writeInt32(serializedData, boundsValid ? maxBounds.y : 0);
 
 
-    const auto& activeCells = cellSpace.getActiveCells();
+    const auto& activeCells = cellSpace.getActiveCells(); // This is std::unordered_map<Point, int>
     std::uint32_t numActiveCells = static_cast<std::uint32_t>(activeCells.size());
-    // Write numActiveCells as int32 for consistency with other int32 fields, though it's unsigned.
     writeInt32(serializedData, static_cast<std::int32_t>(numActiveCells));
 
     for (const auto& pair : activeCells) {
@@ -61,7 +59,7 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
         int state = pair.second;
         writeInt32(serializedData, p.x);
         writeInt32(serializedData, p.y);
-        writeInt32(serializedData, state); // Assuming state fits in int32_t
+        writeInt32(serializedData, state);
     }
     return serializedData;
 }
@@ -70,7 +68,7 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
  * @brief Deserializes data into CellSpace.
  */
 bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data, CellSpace& cellSpace) const {
-    cellSpace.clear(); // Start with a clean slate
+    cellSpace.clear();
 
     size_t offset = 0;
     try {
@@ -82,7 +80,9 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
 
         std::uint32_t numActiveCells = static_cast<std::uint32_t>(readInt32(data, offset));
 
-        std::map<Point, int> loadedCells;
+        std::unordered_map<Point, int> loadedCells; // No explicit PointHash needed
+        loadedCells.reserve(numActiveCells);
+
         for (std::uint32_t i = 0; i < numActiveCells; ++i) {
             Point p;
             p.x = readInt32(data, offset);
@@ -91,21 +91,16 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
             loadedCells[p] = state;
         }
 
-        // Check if we consumed exactly the right amount of data (optional, good for validation)
         if (offset != data.size()) {
             ErrorHandler::logError("SnapshotManager: Deserialization - Trailing data or incomplete read. Offset: " +
                                    std::to_string(offset) + ", Data size: " + std::to_string(data.size()));
-            // Depending on strictness, this could be an error.
         }
 
-        // If numActiveCells is 0, min/maxBounds might be defaults (e.g., 0,0,0,0)
-        // CellSpace::loadActiveCells should correctly initialize bounds if loadedCells is empty.
-        // If loadedCells is not empty, these bounds should be the actual bounds of the loaded set.
         cellSpace.loadActiveCells(loadedCells, minBounds, maxBounds);
 
     } catch (const std::out_of_range& e) {
         ErrorHandler::logError("SnapshotManager: Deserialization error - " + std::string(e.what()));
-        cellSpace.clear(); // Ensure cellspace is empty on error
+        cellSpace.clear();
         return false;
     } catch (...) {
         ErrorHandler::logError("SnapshotManager: Unknown deserialization error.");
@@ -122,29 +117,21 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
  */
 bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& cellSpace) {
     std::string actualFilePath = filePath;
-    // Ensure .snapshot extension (optional, but good practice from goal.md)
     if (actualFilePath.length() < 10 || actualFilePath.substr(actualFilePath.length() - 9) != ".snapshot") {
         actualFilePath += ".snapshot";
     }
 
-    // 1. Serialize CellSpace data
     std::vector<std::uint8_t> serialized_data = serializeCellSpace(cellSpace);
-    if (serialized_data.empty() && !cellSpace.getActiveCells().empty()) { // Check if serialization itself failed for non-empty
+    if (serialized_data.empty() && !cellSpace.getActiveCells().empty()) {
         ErrorHandler::logError("SnapshotManager: Serialization produced empty data for non-empty cell space during save.");
-        // This check might be too simplistic if serializeCellSpace can legitimately return empty for some valid states.
-        // The current serializeCellSpace always returns at least bounds + num_cells.
     }
 
-
-    // 2. Compress the serialized data
     std::vector<std::uint8_t> compressed_data = HuffmanCoding::compress(serialized_data);
-    if (compressed_data.empty() && !serialized_data.empty()) { // Compression failed
+    if (compressed_data.empty() && !serialized_data.empty()) {
         ErrorHandler::logError("SnapshotManager: Huffman compression failed or returned empty for non-empty serialized data.");
         return false;
     }
-    // If original data was empty, compressed_data will contain only original_size=0.
 
-    // 3. Write compressed data to file
     std::ofstream outFile(actualFilePath, std::ios::binary | std::ios::trunc);
     if (!outFile.is_open()) {
         ErrorHandler::logError("SnapshotManager: Failed to open file for saving: " + actualFilePath);
@@ -167,8 +154,7 @@ bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& ce
  * @brief Loads CellSpace state from a file.
  */
 bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpace) {
-    // 1. Read compressed data from file
-    std::ifstream inFile(filePath, std::ios::binary | std::ios::ate); // ate to get size
+    std::ifstream inFile(filePath, std::ios::binary | std::ios::ate);
     if (!inFile.is_open()) {
         ErrorHandler::logError("SnapshotManager: Failed to open file for loading: " + filePath);
         return false;
@@ -179,9 +165,6 @@ bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpac
 
     if (size == 0) {
         ErrorHandler::logError("SnapshotManager: Snapshot file is empty: " + filePath);
-        // This could be a valid empty state if compress() handles it.
-        // HuffmanCoding::compress for empty data returns just original_size=0.
-        // HuffmanCoding::decompress should handle this.
     }
 
     std::vector<std::uint8_t> compressed_data(size);
@@ -192,20 +175,16 @@ bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpac
     }
     inFile.close();
 
-    // 2. Decompress the data
     std::vector<std::uint8_t> serialized_data = HuffmanCoding::decompress(compressed_data);
     if (serialized_data.empty() && !compressed_data.empty() &&
         !(compressed_data.size() == sizeof(uint64_t) && *reinterpret_cast<const uint64_t*>(compressed_data.data()) == 0) ) {
-        // Decompression failed, and it wasn't just an empty stream representing empty original data
         ErrorHandler::logError("SnapshotManager: Huffman decompression failed or returned empty for non-empty compressed data from file: " + filePath);
         return false;
     }
 
-
-    // 3. Deserialize data into CellSpace
     if (!deserializeCellSpace(serialized_data, cellSpace)) {
         ErrorHandler::logError("SnapshotManager: Failed to deserialize cell space data from file: " + filePath);
-        return false; // Deserialization handles clearing cellSpace on error
+        return false;
     }
 
     ErrorHandler::logError("SnapshotManager: State loaded successfully from " + filePath, false);

@@ -3,17 +3,17 @@
 
 #include <vector>
 #include <string>
-#include <map>
-#include "../core/rule.h" // Needs Config to get rules, neighborhood, etc.
-#include "../utils/trie.h"   // The Trie for rule lookup
-#include "cell_space.h"     // Needs CellSpace to get cell states
-#include "../utils/point.h" // For Point
+#include <unordered_map> // Added for the return type
+#include "../core/rule.h"
+#include "../utils/trie.h"
+#include "cell_space.h"
+#include "../utils/point.h" // For Point, and std::hash<Point> via cell_space.h or directly
 
 // Platform-specific includes for dynamic library loading
 #ifdef _WIN32
-#include <windows.h> // For HMODULE, LoadLibrary, GetProcAddress, FreeLibrary
+#include <windows.h>
 #else
-#include <dlfcn.h>   // For void*, dlopen, dlsym, dlclose
+#include <dlfcn.h>
 #endif
 
 // Define a function pointer type for the rule update function from the DLL
@@ -26,7 +26,7 @@ private:
 
     // DLL-based members (used if ruleMode is "dll")
 #ifdef _WIN32
-    HINSTANCE dllHandle_; // HMODULE is a typedef for HINSTANCE
+    HINSTANCE dllHandle_;
 #else
     void* dllHandle_;
 #endif
@@ -34,10 +34,9 @@ private:
 
     // Common members
     std::string currentRuleMode_;
-    std::vector<Point> neighborhoodDefinition_; // Cached neighborhood definition from Config.
-    int defaultState_;                          // Cached default state from Config.
-    // std::vector<int> possibleStates_;        // Cached from config, but not used by current logic. Can be removed if not planned for use.
-    bool initialized_;                          // Flag to check if the engine has been initialized.
+    std::vector<Point> neighborhoodDefinition_;
+    int defaultState_;
+    bool initialized_;
 
     // Helper methods for DLL handling
     bool loadRuleLibrary(const std::string& dllPathBaseFromConfig, const std::string& functionName);
@@ -45,16 +44,15 @@ private:
 
 public:
     RuleEngine();
-    ~RuleEngine(); // Destructor to unload DLL
+    ~RuleEngine();
 
-    // Disable copy constructor and assignment operator
     RuleEngine(const RuleEngine&) = delete;
     RuleEngine& operator=(const RuleEngine&) = delete;
 
     /**
      * @brief Initializes the RuleEngine with configuration data.
      * Sets the mode (Trie or DLL) and populates rules accordingly.
-     * @param config A constant reference to the Config object.
+     * @param config A constant reference to the Rule object.
      * @return True if initialization was successful, false otherwise.
      */
     bool initialize(const Rule& config);
@@ -62,9 +60,10 @@ public:
     /**
      * @brief Calculates the next generation of cell states based on the current mode.
      * @param currentCellSpace A constant reference to the current state of the CellSpace.
-     * @return A vector of pairs (Point, int) for cells that change state.
+     * @return An unordered_map of (Point, int) for cells that change state.
+     * The Point is the coordinate, and int is the new state.
      */
-    std::vector<std::pair<Point, int>> calculateNextGeneration(const CellSpace& currentCellSpace) const;
+    std::unordered_map<Point, int> calculateNextGeneration(const CellSpace& currentCellSpace) const;
 
     /**
      * @brief Checks if the RuleEngine has been successfully initialized.
