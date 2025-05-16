@@ -7,89 +7,11 @@
 #include <vector>
 #include <stdexcept> // For std::exception
 
-// Map module names to Logging::Module enum values, useful for setting log levels from command line or config
-std::unordered_map<std::string, Logging::Module> g_moduleNameMap = {
-    {"core", Logging::Module::Core},
-    {"renderer", Logging::Module::Renderer},
-    {"input", Logging::Module::Input},
-    {"ui", Logging::Module::UI},
-    {"commandparser", Logging::Module::CommandParser},
-    {"cellspace", Logging::Module::CellSpace},
-    {"ruleengine", Logging::Module::RuleEngine},
-    {"snapshotmanager", Logging::Module::SnapshotManager},
-    {"fileio", Logging::Module::FileIO},
-    {"utils", Logging::Module::Utils},
-    {"main", Logging::Module::Main},
-    {"errorhandler", Logging::Module::ErrorHandler},
-    {"config", Logging::Module::Rule},
-    {"huffman", Logging::Module::Huffman}
-};
-
-// Map string level names to spdlog level enums
-std::unordered_map<std::string, spdlog::level::level_enum> g_logLevelNameMap = {
-    {"trace", spdlog::level::trace},
-    {"debug", spdlog::level::debug},
-    {"info", spdlog::level::info},
-    {"warn", spdlog::level::warn},
-    {"warning", spdlog::level::warn}, // alias
-    {"error", spdlog::level::err},
-    {"critical", spdlog::level::critical},
-    {"off", spdlog::level::off}
-};
-
-/**
- * @brief Parses command-line arguments to set log levels.
- * Example arguments:
- * -loglevel:global=debug
- * -loglevel:renderer=trace
- * -loglevel:cellspace=info
- * @param argc Number of arguments
- * @param argv Array of argument strings
- * @param main_logger Main logger for logging during parsing
- */
-void ParseCommandLineLogLevels(int argc, char* argv[], std::shared_ptr<spdlog::logger> main_logger) {
-    const std::string argPrefix = "-loglevel:";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg.rfind(argPrefix, 0) == 0) { // Check if argument starts with "-loglevel:"
-            std::string moduleAndLevel = arg.substr(argPrefix.length());
-            size_t separatorPos = moduleAndLevel.find('=');
-            if (separatorPos != std::string::npos) {
-                std::string moduleName = moduleAndLevel.substr(0, separatorPos);
-                std::string levelName = moduleAndLevel.substr(separatorPos + 1);
-
-                // Convert to lowercase for case-insensitive matching
-                std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
-                std::transform(levelName.begin(), levelName.end(), levelName.begin(), ::tolower);
-
-                auto levelIt = g_logLevelNameMap.find(levelName);
-                if (levelIt == g_logLevelNameMap.end()) {
-                    if (main_logger) main_logger->warn("Invalid log level name '{}' from command line argument '{}'.", levelName, arg);
-                    continue;
-                }
-                spdlog::level::level_enum logLevel = levelIt->second;
-
-                if (moduleName == "global") {
-                    Logging::SetGlobalLevel(logLevel);
-                    if (main_logger) main_logger->info("Global log level set via command line to: {}.", levelName);
-                } else {
-                    auto moduleIt = g_moduleNameMap.find(moduleName);
-                    if (moduleIt != g_moduleNameMap.end()) {
-                        Logging::SetLevel(moduleIt->second, logLevel);
-                        if (main_logger) main_logger->info("Log level for module '{}' set via command line to: {}.", moduleName, levelName);
-                    } else {
-                        if (main_logger) main_logger->warn("Unknown module name '{}' from command line argument '{}'.", moduleName, arg);
-                    }
-                }
-            } else {
-                if (main_logger) main_logger->warn("Malformed log level argument: '{}'. Expected format: -loglevel:module_name=level_name", arg);
-            }
-        }
-    }
-}
-
 int main(int argc, char* argv[]) {
     Logging::Init("windcell.log", spdlog::level::info);
+
+    Logging::SetGlobalLevel(spdlog::level::info);
+
     auto main_logger = Logging::GetLogger(Logging::Module::Main);
     if (!main_logger) {
         std::cerr << "Critical error: Failed to initialize main logger. Exiting." << std::endl;
@@ -103,9 +25,6 @@ int main(int argc, char* argv[]) {
             main_logger->trace("argv[{}]: {}", i, argv[i]);
         }
     }
-
-    // 2. Parse command line for log level settings
-    ParseCommandLineLogLevels(argc, argv, main_logger);
 
     // 3. Create and run the application instance
     main_logger->info("Creating Application instance...");

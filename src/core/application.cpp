@@ -466,7 +466,7 @@ void Application::executeCommand() {
 
     if (logger) logger->info("Executing command: {}", commandToExecute);
 
-    bool commandRecognized = commandParser_.parseAndExecute(commandToExecute, cellSpace_, viewport_, snapshotManager_);
+    commandParser_.parseAndExecute(commandToExecute, cellSpace_, viewport_, snapshotManager_);
 
     if (commandInputActive_) {
         toggleCommandInput();
