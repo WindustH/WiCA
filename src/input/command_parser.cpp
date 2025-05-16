@@ -71,10 +71,7 @@ std::string CommandParser::joinTokens(const std::vector<std::string>& tokens, si
     return result;
 }
 
-bool CommandParser::parseAndExecute(const std::string& commandString,
-                                   CellSpace& cellSpace,
-                                   Viewport& viewport,
-                                   SnapshotManager& snapshotManager) {
+bool CommandParser::parseAndExecute(const std::string& commandString) {
     if (commandString.empty()) {
         return true;
     }

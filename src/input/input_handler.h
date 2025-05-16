@@ -23,12 +23,12 @@ private:
     bool leftMouseDown_;
 
     // Helper methods to delegate specific event types
-    void handleKeyDown(const SDL_KeyboardEvent& keyEvent, Viewport& viewport);
+    void handleKeyDown(const SDL_KeyboardEvent& keyEvent);
     // void handleKeyUp(const SDL_KeyboardEvent& keyEvent); // Kept for completeness, but not used much currently
     void handleTextInput(const SDL_TextInputEvent& textEvent);
-    void handleMouseButtonDown(const SDL_MouseButtonEvent& buttonEvent, CellSpace& cellSpace, Viewport& viewport);
+    void handleMouseButtonDown(const SDL_MouseButtonEvent& buttonEvent, Viewport& viewport);
     void handleMouseButtonUp(const SDL_MouseButtonEvent& buttonEvent);
-    void handleMouseMotion(const SDL_MouseMotionEvent& motionEvent, CellSpace& cellSpace, Viewport& viewport);
+    void handleMouseMotion(const SDL_MouseMotionEvent& motionEvent, Viewport& viewport);
     void handleMouseWheel(const SDL_MouseWheelEvent& wheelEvent, Viewport& viewport);
 
 public:
@@ -43,7 +43,7 @@ public:
      * @param cellSpace Reference to the CellSpace for brush operations.
      * @param viewport Reference to the Viewport for mouse coordinate conversions and view changes.
      */
-    void processEvents(CellSpace& cellSpace, Viewport& viewport);
+    void processEvents(Viewport& viewport);
 };
 
 #endif // INPUT_HANDLER_H

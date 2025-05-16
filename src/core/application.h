@@ -97,7 +97,7 @@ public:
     // Brush control
     void setBrushState(int state);
     void setBrushSize(int size);
-    void applyBrush(Point worldPos, CellSpace& cs);
+    void applyBrush(Point worldPos);
     int getCurrentBrushState() const;
     int getCurrentBrushSize() const;
     void toggleBrushInfoDisplay();

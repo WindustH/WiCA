@@ -20,7 +20,7 @@ InputHandler::InputHandler(Application& app)
  * @param cellSpace Reference to CellSpace for brush operations.
  * @param viewport Reference to Viewport for view manipulations.
  */
-void InputHandler::processEvents(CellSpace& cellSpace, Viewport& viewport) {
+void InputHandler::processEvents(Viewport& viewport) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -28,7 +28,7 @@ void InputHandler::processEvents(CellSpace& cellSpace, Viewport& viewport) {
                 application_.quit();
                 break;
             case SDL_KEYDOWN:
-                handleKeyDown(event.key, viewport);
+                handleKeyDown(event.key);
                 break;
             case SDL_TEXTINPUT:
                 if (application_.isCommandInputActive()) {
@@ -38,14 +38,14 @@ void InputHandler::processEvents(CellSpace& cellSpace, Viewport& viewport) {
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 // std::cout << "SDL_MOUSEBUTTONDOWN event: " << (int)event.button.button << " at (" << event.button.x << "," << event.button.y << ")" << std::endl; // Debug
-                handleMouseButtonDown(event.button, cellSpace, viewport);
+                handleMouseButtonDown(event.button, viewport);
                 break;
             case SDL_MOUSEBUTTONUP:
                 handleMouseButtonUp(event.button);
                 break;
             case SDL_MOUSEMOTION:
                 // std::cout << "SDL_MOUSEMOTION event to (" << event.motion.x << "," << event.motion.y << ")" << std::endl; // Debug
-                handleMouseMotion(event.motion, cellSpace, viewport);
+                handleMouseMotion(event.motion, viewport);
                 break;
             case SDL_MOUSEWHEEL:
                 handleMouseWheel(event.wheel, viewport);
@@ -75,7 +75,7 @@ void InputHandler::handleTextInput(const SDL_TextInputEvent& textEvent) {
  * @param keyEvent The SDL_KeyboardEvent.
  * @param viewport Reference to the Viewport.
  */
-void InputHandler::handleKeyDown(const SDL_KeyboardEvent& keyEvent, Viewport& viewport) {
+void InputHandler::handleKeyDown(const SDL_KeyboardEvent& keyEvent) {
     if (application_.isCommandInputActive()) {
         switch (keyEvent.keysym.sym) {
             case SDLK_RETURN:
@@ -119,7 +119,7 @@ void InputHandler::handleKeyDown(const SDL_KeyboardEvent& keyEvent, Viewport& vi
 /**
  * @brief Handles mouse button down events.
  */
-void InputHandler::handleMouseButtonDown(const SDL_MouseButtonEvent& buttonEvent, CellSpace& cellSpace, Viewport& viewport) {
+void InputHandler::handleMouseButtonDown(const SDL_MouseButtonEvent& buttonEvent, Viewport& viewport) {
     lastMousePos_ = Point(buttonEvent.x, buttonEvent.y);
 
     if (buttonEvent.button == SDL_BUTTON_LEFT) {
@@ -127,7 +127,7 @@ void InputHandler::handleMouseButtonDown(const SDL_MouseButtonEvent& buttonEvent
         leftMouseDown_ = true;
         Point worldPos = viewport.screenToWorld(lastMousePos_);
         // std::cout << "Brush applied at screen (" << lastMousePos_.x << "," << lastMousePos_.y << ") -> world (" << worldPos.x << "," << worldPos.y << ")" << std::endl; // Debug
-        application_.applyBrush(worldPos, cellSpace);
+        application_.applyBrush(worldPos);
     } else if (buttonEvent.button == SDL_BUTTON_MIDDLE) {
         middleMouseDown_ = true;
     }
@@ -148,7 +148,7 @@ void InputHandler::handleMouseButtonUp(const SDL_MouseButtonEvent& buttonEvent) 
 /**
  * @brief Handles mouse motion events.
  */
-void InputHandler::handleMouseMotion(const SDL_MouseMotionEvent& motionEvent, CellSpace& cellSpace, Viewport& viewport) {
+void InputHandler::handleMouseMotion(const SDL_MouseMotionEvent& motionEvent,Viewport& viewport) {
     Point currentMousePos(motionEvent.x, motionEvent.y);
     if (middleMouseDown_) {
         Point delta(currentMousePos.x - lastMousePos_.x, currentMousePos.y - lastMousePos_.y);
@@ -157,7 +157,7 @@ void InputHandler::handleMouseMotion(const SDL_MouseMotionEvent& motionEvent, Ce
         // std::cout << "Left mouse drag." << std::endl; // Debug
         Point worldPos = viewport.screenToWorld(currentMousePos);
         // std::cout << "Brush dragged at screen (" << currentMousePos.x << "," << currentMousePos.y << ") -> world (" << worldPos.x << "," << worldPos.y << ")" << std::endl; // Debug
-        application_.applyBrush(worldPos, cellSpace);
+        application_.applyBrush(worldPos);
     }
     lastMousePos_ = currentMousePos; // Update lastMousePos for both panning and next drag if LMD is still down
 }

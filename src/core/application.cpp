@@ -281,7 +281,7 @@ void Application::run() {
 }
 
 void Application::processInput() {
-    inputHandler_.processEvents(cellSpace_, viewport_);
+    inputHandler_.processEvents(viewport_);
 }
 
 void Application::updateSimulation() {
@@ -402,7 +402,7 @@ void Application::setBrushSize(int size) {
     }
 }
 
-void Application::applyBrush(Point worldPos, CellSpace& cs) {
+void Application::applyBrush(Point worldPos) {
     int halfSize = (currentBrushSize_ -1) / 2;
     for (int dy = -halfSize; dy <= halfSize; ++dy) {
         for (int dx = -halfSize; dx <= halfSize; ++dx) {
@@ -466,7 +466,7 @@ void Application::executeCommand() {
 
     if (logger) logger->info("Executing command: {}", commandToExecute);
 
-    commandParser_.parseAndExecute(commandToExecute, cellSpace_, viewport_, snapshotManager_);
+    commandParser_.parseAndExecute(commandToExecute);
 
     if (commandInputActive_) {
         toggleCommandInput();

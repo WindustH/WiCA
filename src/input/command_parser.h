@@ -52,16 +52,10 @@ public:
      * @brief Parses the given command string and executes the corresponding action.
      * The commandString should NOT have the leading '/'
      * @param commandString The full command string entered by the user (e.g., "save my_sim.snapshot").
-     * @param cellSpace Reference to the CellSpace, needed for commands affecting it.
-     * @param viewport Reference to the Viewport, for commands like 'center' or 'autofit'.
-     * @param snapshotManager Reference to the SnapshotManager for 'save' and 'load' commands.
      * @return True if the command was recognized and successfully (or attempted to be) executed,
      * false if the command is unknown or has invalid syntax/arguments.
      */
-    bool parseAndExecute(const std::string& commandString,
-                         CellSpace& cellSpace,
-                         Viewport& viewport,
-                         SnapshotManager& snapshotManager);
+    bool parseAndExecute(const std::string& commandString);
 };
 
 #endif // COMMAND_PARSER_H
