@@ -17,13 +17,14 @@ private:
     std::unordered_set<Point> cellsToEvaluate_;
 
     int defaultState_;
-    std::vector<Point> neighborhood_;
-    std::vector<Point> generalNeighborhood_;
 
+    bool boundsInitialized_;
+
+    std::vector<Point> neighborhood_;
+    std::vector<Point> reverseNeighborhood_;
 
     Point minGridBounds_;
     Point maxGridBounds_;
-    bool boundsInitialized_;
 
     void updateBounds(Point coordinates);
     void recalculateBounds();

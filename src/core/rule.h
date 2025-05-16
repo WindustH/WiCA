@@ -26,6 +26,8 @@ private:
     int defaultState_;                            // The default state for cells not explicitly defined.
     std::vector<Point> neighborhood_;             // Defines neighbor offsets (e.g., Moore, Von Neumann).
 
+    bool loadedSuccessfully_;                     // Flag to indicate if configuration was loaded without errors.
+
     // Rule definition mode
     std::string ruleMode_; // "trie" or "dll"
 
@@ -37,7 +39,7 @@ private:
     std::string ruleFunctionName_;                // Name of the function within the DLL.
 
     std::map<int, Color> stateColorMap_;          // Maps each cell state to a specific color for rendering.
-    bool loadedSuccessfully_;                     // Flag to indicate if configuration was loaded without errors.
+
 
     // --- Helper methods for parsing JSON ---
     bool parseStates(const nlohmann::json& j);

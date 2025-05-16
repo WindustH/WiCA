@@ -21,7 +21,7 @@ CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
             generalNeighborhoodSet.insert(cell + offset);
         }
     }
-    generalNeighborhood_.assign(generalNeighborhoodSet.begin(), generalNeighborhoodSet.end());
+    reverseNeighborhood_.assign(generalNeighborhoodSet.begin(), generalNeighborhoodSet.end());
 }
 
 /**
@@ -81,7 +81,7 @@ void CellSpace::setCellState(Point coordinates, int state) {
     auto it = nonDefaultCells_.find(coordinates);
     int currentState = (it != nonDefaultCells_.end()) ? it->second : defaultState_;
     if(state!=currentState){
-        for(Point offset : generalNeighborhood_){
+        for(Point offset : reverseNeighborhood_){
             cellsToEvaluate_.insert(coordinates+offset);
         }
     }
@@ -172,7 +172,7 @@ void CellSpace::loadCells(const std::unordered_map<Point, int>& cells, Point min
         // recalculateBounds();
     }
     for(auto pair : nonDefaultCells_){
-        for(Point offset : generalNeighborhood_){
+        for(Point offset : reverseNeighborhood_){
             cellsToEvaluate_.insert(offset+pair.first);
         }
     }
