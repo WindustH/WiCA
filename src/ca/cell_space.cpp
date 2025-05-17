@@ -3,6 +3,7 @@
 #include <unordered_map> // Ensure it's included
 #include "../utils/logger.h" // New logger
 #include <set>
+#include "../utils/timer.h"
 
 /**
  * @brief Constructor for CellSpace.
@@ -13,7 +14,7 @@ CellSpace::CellSpace(int defState, std::vector<Point> neighborhood)
     boundsInitialized_(false),
     neighborhood_(neighborhood) {
 
-    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    auto logger = Logger::getLogger(Logger::Module::CellSpace);
     if (logger) logger->info("Start to initialize cellspace.");
 
     minGridBounds_ = Point(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
@@ -52,7 +53,7 @@ void CellSpace::updateBounds(Point coordinates) {
  * @brief Recalculates the entire bounding box based on current active cells.
  */
 void CellSpace::recalculateBounds() {
-    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    auto logger = Logger::getLogger(Logger::Module::CellSpace);
     if (logger) logger->trace("Called CellSpace::recalculateBounds");
 
     boundsInitialized_ = false;
@@ -136,12 +137,17 @@ std::vector<int> CellSpace::getNeighborStates(Point centerCoordinates) const {
  * Before update, the cells to be evaluate will be cleared.
  */
 void CellSpace::updateCells(const std::unordered_map<Point, int>& cellsToUpdate) {
-    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    auto logger = Logger::getLogger(Logger::Module::CellSpace);
+    auto timer = Timer::getTimer(Timer::Module::applyUpdate);
+    timer.start();
     if (logger) logger->debug("Received cells to update. Start to apply update.");
 
     clearCellsToEvaluate();
 
-    if (cellsToUpdate.empty()) return;
+    if (cellsToUpdate.empty()) {
+        return;
+        timer.stop();
+    }
     bool boundaryPotentiallyAffected = false;
 
     for (const auto& cellUpdatePair : cellsToUpdate) {
@@ -158,6 +164,8 @@ void CellSpace::updateCells(const std::unordered_map<Point, int>& cellsToUpdate)
     } else if (boundaryPotentiallyAffected) {
 
     }
+    timer.stop();
+    return;
 }
 
 
@@ -170,7 +178,7 @@ const std::unordered_set<Point>& CellSpace::getCellsToEvaluate() const {
 }
 
 void CellSpace::loadCells(const std::unordered_map<Point, int>& cells, Point minB, Point maxB) {
-    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    auto logger = Logger::getLogger(Logger::Module::CellSpace);
     if (logger) logger->info("Received cells to load. Start to load cells.");
 
     nonDefaultCells_ = cells;
@@ -214,7 +222,7 @@ bool CellSpace::areBoundsInitialized() const {
 }
 
 void CellSpace::clear() {
-    auto logger = Logging::GetLogger(Logging::Module::CellSpace);
+    auto logger = Logger::getLogger(Logger::Module::CellSpace);
     if (logger) logger->info("Start to clear the cellspace.");
 
     nonDefaultCells_.clear();

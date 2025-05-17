@@ -13,7 +13,7 @@ Rule::Rule()
 }
 
 bool Rule::loadFromFile(const std::string& filePath) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     loadedSuccessfully_ = false;
 
     std::ifstream configFileStream(filePath);
@@ -49,7 +49,7 @@ bool Rule::isLoaded() const {
 }
 
 bool Rule::parseStates(const json& j) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     try {
         if (!j.contains("states") || !j["states"].is_array()) {
             if (logger) logger->error("'states' field is missing or not an array.");
@@ -68,7 +68,7 @@ bool Rule::parseStates(const json& j) {
 }
 
 bool Rule::parseDefaultState(const json& j) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     try {
         if (!j.contains("default_state") || !j["default_state"].is_number_integer()) {
             if (logger) logger->error("'default_state' field is missing or not an integer.");
@@ -98,7 +98,7 @@ bool Rule::parseDefaultState(const json& j) {
 }
 
 bool Rule::parseNeighborhood(const json& j) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     try {
         if (!j.contains("neighborhood") || !j["neighborhood"].is_array()) {
             if (logger) logger->error("'neighborhood' field is missing or not an array. This is required for both Trie and DLL (for neighbor count) modes.");
@@ -123,7 +123,7 @@ bool Rule::parseNeighborhood(const json& j) {
 }
 
 bool Rule::parseRuleSettings(const json& j) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     // Reset member variables related to rules before parsing
     rules_.clear();
     ruleDllPath_.clear();
@@ -154,7 +154,7 @@ bool Rule::parseRuleSettings(const json& j) {
 
 // Helper function for default color assignment (to avoid repetition)
 void assignDefaultColors(std::map<int, Color>& mapToFill, const std::vector<int>& states) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     mapToFill.clear(); // Ensure we start fresh
     if (logger) logger->info("Assigning default colors for states."); // Informative message
     for (int s : states) {
@@ -171,7 +171,7 @@ void assignDefaultColors(std::map<int, Color>& mapToFill, const std::vector<int>
 }
 
 bool Rule::parseStateColorMap(const nlohmann::json& j) {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     try {
         stateColorMap_.clear(); // Start with an empty map
         bool format_valid = true; // Assume format is valid initially
@@ -294,7 +294,7 @@ const std::map<int, Color>& Rule::getStateColorMap() const {
 }
 
 Color Rule::getColorForState(int state) const {
-    auto logger = Logging::GetLogger(Logging::Module::Rule);
+    auto logger = Logger::getLogger(Logger::Module::Rule);
     auto it = stateColorMap_.find(state);
     if (it != stateColorMap_.end()) {
         return it->second;

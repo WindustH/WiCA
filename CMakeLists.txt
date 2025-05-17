@@ -38,6 +38,7 @@ find_package(SDL2_ttf REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
+find_package(TBB REQUIRED)
 
 # Define project root for clarity
 set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
@@ -56,6 +57,7 @@ set(PROJECT_SOURCES
     ${PROJECT_ROOT}/src/snap/huffman_coding.cpp
     ${PROJECT_ROOT}/src/utils/error_handler.cpp
     ${PROJECT_ROOT}/src/utils/logger.cpp
+    ${PROJECT_ROOT}/src/utils/timer.cpp
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
@@ -88,6 +90,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     nlohmann_json::nlohmann_json
     fmt::fmt
     spdlog::spdlog
+    TBB::tbb
 )
 
 # --- Plugin Compilation ---

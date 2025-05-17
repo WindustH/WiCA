@@ -3,6 +3,7 @@
 #include "../utils/logger.h" // New logger
 #include <filesystem>   // For path manipulation (C++17)
 #include <unordered_map> // Make sure it's included
+#include "../utils/timer.h"
 
 // Constructor
 RuleEngine::RuleEngine()
@@ -20,7 +21,7 @@ RuleEngine::~RuleEngine() {
 // --- DLL Handling Methods ---
 
 bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const std::string& functionName) {
-    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
+    auto logger = Logger::getLogger(Logger::Module::RuleEngine);
     unloadRuleLibrary();
     if (logger) logger->info("Start to load DLL.");
 
@@ -131,7 +132,7 @@ void RuleEngine::unloadRuleLibrary() {
 
 
 bool RuleEngine::initialize(const Rule& config) {
-    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
+    auto logger = Logger::getLogger(Logger::Module::RuleEngine);
     if (logger) logger->info("Start to initialize rule engine.");
     initialized_ = false;
     unloadRuleLibrary();
@@ -157,12 +158,16 @@ bool RuleEngine::initialize(const Rule& config) {
 }
 
 std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& currentCellSpace) const {
-    auto logger = Logging::GetLogger(Logging::Module::RuleEngine);
+    auto logger = Logger::getLogger(Logger::Module::RuleEngine);
+    auto timer = Timer::getTimer(Timer::Module::calculateForUpdate);
+    timer.start();
+
     std::unordered_map<Point, int> cellsToUpdate;
 
     if (!initialized_) {
         if (logger) logger->error("Cannot calculate next generation. Not initialized.");
         return cellsToUpdate; // Return empty map
+        timer.stop();
     }
 
     const auto& cellsToEvaluate = currentCellSpace.getCellsToEvaluate();
@@ -184,6 +189,7 @@ std::unordered_map<Point, int> RuleEngine::calculateForUpdate(const CellSpace& c
             cellsToUpdate[cellCoord] = nextState; // Insert/update in the map
         }
     }
+    timer.stop();
     return cellsToUpdate;
 }
 

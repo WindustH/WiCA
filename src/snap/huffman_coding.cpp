@@ -122,7 +122,7 @@ namespace HuffmanCoding {
 
     // --- Compression Main Function ---
     std::vector<std::uint8_t> compress(const std::vector<std::uint8_t>& dataToCompress) {
-        auto logger = Logging::GetLogger(Logging::Module::Huffman);
+        auto logger = Logger::getLogger(Logger::Module::Huffman);
         if (dataToCompress.empty()) {
             if (logger) logger->error("Cannot compress empty data.");
             std::vector<std::uint8_t> compressedOutput;
@@ -222,7 +222,7 @@ namespace HuffmanCoding {
 
     // --- Decompression Main Function ---
     std::vector<std::uint8_t> decompress(const std::vector<std::uint8_t>& compressedData) {
-        auto logger = Logging::GetLogger(Logging::Module::Huffman);
+        auto logger = Logger::getLogger(Logger::Module::Huffman);
         if (compressedData.size() < sizeof(std::uint64_t) + sizeof(std::uint32_t) + 1) { // Min size: original_size + freq_table_size + padding_info
             if (logger) logger->error("Compressed data is too short to be valid.");
             return {};

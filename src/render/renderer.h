@@ -5,17 +5,42 @@
 #include <SDL2/SDL_ttf.h>
 #include <string>
 #include <vector>
-#include <unordered_map> // Changed from <map>
-#include "../core/rule.h" // Required for Config
-#include "../ca/cell_space.h"
-#include "viewport.h"
-#include "../utils/color.h"
+#include <unordered_map> // For stateSdlColorMap_
+#include <map>             // For batchedRects/Points in renderCells implementation
+#include <unordered_set>   // For globallyLoggedMissingColors
+
+#include "../core/rule.h"       // Required for Rule
+#include "../ca/cell_space.h"   // Required for CellSpace
+#include "viewport.h"           // Required for Viewport (includes Point struct)
+#include "../utils/color.h"     // Required for Color
 
 // Enum for grid display mode
 enum class GridDisplayMode {
     AUTO,
     ON,
     OFF
+};
+
+// Helper struct to store pre-calculated render information for each cell rectangle
+struct CellRenderInfo {
+    SDL_Rect rect;
+    SDL_Color color;
+};
+
+// Helper struct to store pre-calculated render information for each cell pixel
+struct PixelRenderInfo {
+    Point screenPos; // Point struct from viewport.h (likely {int x, int y})
+    SDL_Color color;
+};
+
+// Custom comparator for SDL_Color to use it as a key in std::map
+struct SdlColorCompare {
+    bool operator()(const SDL_Color& a, const SDL_Color& b) const {
+        if (a.r != b.r) return a.r < b.r;
+        if (a.g != b.g) return a.g < b.g;
+        if (a.b != b.b) return a.b < b.b;
+        return a.a < b.a; // Compare alpha as well
+    }
 };
 
 /**
@@ -26,7 +51,7 @@ class Renderer {
 private:
     SDL_Renderer* sdlRenderer_;
     SDL_Window* sdlWindow_;
-    std::unordered_map<int, SDL_Color> stateSdlColorMap_; // Changed from std::map
+    std::unordered_map<int, SDL_Color> stateSdlColorMap_;
 
     TTF_Font* uiFont_;
     SDL_Color uiTextColor_;
@@ -46,11 +71,19 @@ private:
     GridDisplayMode gridDisplayMode_;
     int gridHideThreshold_;
 
+    // Private helper methods
     bool initializeTTF();
     void cleanupTTF();
     bool loadFontInternal(const std::string& fontIdentifier, int fontSize, bool isFullPath = false);
     bool loadDefaultFont(int fontSize);
+
+    // Methods for rendering different parts
+    void renderCells(const CellSpace& cellSpace, const Viewport& viewport);
+    void renderGridLines(const Viewport& viewport);
     void renderMultiLineText(const std::string& text, int x, int y, SDL_Color color, int maxWidth, int& outHeight);
+
+    // Static member to keep track of logged missing colors to avoid spamming logs
+    static std::unordered_set<int> globallyLoggedMissingColors;
 
 public:
     Renderer();
@@ -60,10 +93,6 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     bool initialize(SDL_Window* window, const Rule& config);
-    /**
-     * @brief Reinitializes the color map from a new configuration.
-     * @param newConfig The new configuration object.
-     */
     void reinitializeColors(const Rule& newConfig);
 
     void renderGrid(const CellSpace& cellSpace, const Viewport& viewport);
@@ -76,31 +105,19 @@ public:
 
     bool setFontSize(int newSize);
     bool setFontPath(const std::string& fontPath, int fontSize);
+    int getCurrentFontSize() const { return currentFontSize_; }
 
     void setGridDisplayMode(GridDisplayMode mode);
     void setGridHideThreshold(int threshold);
     GridDisplayMode getGridDisplayMode() const { return gridDisplayMode_; }
     int getGridHideThreshold() const { return gridHideThreshold_; }
 
-    /**
-     * @brief Sets the grid line width.
-     * @param width The new width in pixels (must be >= 1).
-     */
     void setGridLineWidth(int width);
     int getGridLineWidth() const { return gridLineWidth_; }
 
-    /**
-     * @brief Sets the grid line color.
-     * @param r Red component (0-255).
-     * @param g Green component (0-255).
-     * @param b Blue component (0-255).
-     * @param a Alpha component (0-255, default 255).
-     */
     void setGridLineColor(Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255);
     SDL_Color getGridLineColor() const { return gridLineColor_; }
 
-
-    int getCurrentFontSize() const { return currentFontSize_; }
     bool isUiReady() const;
     static SDL_Color convertToSdlColor(const Color& color);
 };

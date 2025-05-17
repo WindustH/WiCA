@@ -25,6 +25,8 @@ Application::Application()
       simulationSpeed_(10.0f),
       timePerUpdate_(100),
       simulationLag_(0),
+      timePerFrame_(10),
+      refreshLag_(0),
       currentBrushState_(1),
       currentBrushSize_(1),
       commandInputActive_(false),
@@ -45,7 +47,7 @@ Application::~Application() {
 // --- Initialization and Cleanup ---
 
 bool Application::initializeSDL() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
         ErrorHandler::failure("SDL_Init failed.");
@@ -76,7 +78,7 @@ bool Application::initializeSDL() {
 }
 
 bool Application::initializeSubsystems(const std::string& configPath) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     currentConfigPath_ = configPath; // Store the initial config path
 
     if (logger) logger->debug("initializeSubsystems loading config: {}", currentConfigPath_);
@@ -150,7 +152,7 @@ bool Application::initializeSubsystems(const std::string& configPath) {
 }
 
 void Application::cleanupSDL() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (glContext_) {
         SDL_GL_DeleteContext(glContext_);
         glContext_ = nullptr;
@@ -165,7 +167,7 @@ void Application::cleanupSDL() {
 }
 
 void Application::cleanupSubsystems() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     renderer_.cleanup();
     if (logger) logger->info("Subsystems cleaned up.");
 }
@@ -187,7 +189,7 @@ bool Application::initialize(const std::string& configPath) {
 }
 
 void Application::loadRule(const std::string& configPath) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     bool wasPaused = simulationPaused_;
     if (!wasPaused) pauseSimulation();
 
@@ -264,6 +266,7 @@ void Application::run() {
         Uint32 elapsedTime = currentTime - previousTime;
         previousTime = currentTime;
         simulationLag_ += elapsedTime;
+        refreshLag_ += elapsedTime;
 
         processInput();
 
@@ -276,7 +279,16 @@ void Application::run() {
             updateSimulation();
             simulationLag_ = 0;
         }
-        renderScene();
+
+        if (timePerFrame_ > 0) {
+            while (refreshLag_ >= timePerFrame_) {
+                renderScene();
+                refreshLag_ -= timePerFrame_;
+            }
+        } else if (timePerFrame_ == 0) {
+            renderScene();
+            refreshLag_ = 0;
+        }
     }
 }
 
@@ -321,13 +333,13 @@ void Application::renderScene() {
 
 
 void Application::quit() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     isRunning_ = false;
     if (logger) logger->info("Quit signal received.");
 }
 
 void Application::togglePause() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     simulationPaused_ = !simulationPaused_;
     if (simulationPaused_) {
         postMessageToUser("Simulation Paused.");
@@ -341,7 +353,7 @@ void Application::togglePause() {
     }
 }
 void Application::pauseSimulation() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (!simulationPaused_) {
         simulationPaused_ = true;
         simulationLag_ = 0;
@@ -350,7 +362,7 @@ void Application::pauseSimulation() {
     }
 }
 void Application::resumeSimulation() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (simulationPaused_) {
         simulationPaused_ = false;
         lastUpdateTime_ = SDL_GetTicks();
@@ -362,7 +374,7 @@ void Application::resumeSimulation() {
 
 
 void Application::setBrushState(int state) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     bool isValidState = false;
     const auto& availableStates = rule_.getStates();
 
@@ -391,7 +403,7 @@ void Application::setBrushState(int state) {
 }
 
 void Application::setBrushSize(int size) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (size >= 1 && size <= 50) {
         currentBrushSize_ = size;
         if (logger) logger->info("Brush size set to {}", std::to_string(size));
@@ -417,7 +429,7 @@ void Application::applyBrush(Point worldPos) {
 
 
 void Application::toggleCommandInput() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     commandInputActive_ = !commandInputActive_;
     if (commandInputActive_) {
         commandInputBuffer_.clear();
@@ -447,7 +459,7 @@ void Application::appendCommandText(const std::string& text, bool isBackspace) {
 }
 
 void Application::executeCommand() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (!commandInputActive_ || commandInputBuffer_.empty()) {
         if (commandInputActive_) toggleCommandInput();
         return;
@@ -475,7 +487,7 @@ void Application::executeCommand() {
 }
 
 void Application::setAppFontSize(int size) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (size > 0 && size < 100) {
         if (renderer_.setFontSize(size)) {
             postMessageToUser("Font size set to " + std::to_string(size));
@@ -490,7 +502,7 @@ void Application::setAppFontSize(int size) {
 }
 
 void Application::setAppFontPath(const std::string& path) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (path.empty()) {
         postMessageToUser("Error: Font path cannot be empty.");
         return;
@@ -558,7 +570,7 @@ bool Application::isViewportAutoFitEnabled() const {
 
 
 void Application::setAutoFitView(bool enabled) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     viewport_.setAutoFit(enabled, cellSpace_);
     if (enabled) {
         if (logger) logger->info("Autofit enabled.");
@@ -570,7 +582,7 @@ void Application::setAutoFitView(bool enabled) {
 }
 
 void Application::centerViewOnGrid() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (cellSpace_.areBoundsInitialized() && !cellSpace_.getNonDefaultCells().empty()) {
         Point minB = cellSpace_.getMinBounds();
         Point maxB = cellSpace_.getMaxBounds();
@@ -589,7 +601,7 @@ void Application::centerViewOnGrid() {
 }
 
 void Application::saveSnapshot(const std::string& filename) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (snapshotManager_.saveState(filename, cellSpace_)) {
         if (logger) logger->info("Snapshot saved to {}",filename);
         postMessageToUser("Snapshot saved: " + filename);
@@ -600,7 +612,7 @@ void Application::saveSnapshot(const std::string& filename) {
 }
 
 void Application::loadSnapshot(const std::string& filename) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     bool wasPaused = simulationPaused_;
     if(!wasPaused) pauseSimulation();
 
@@ -621,7 +633,7 @@ void Application::loadSnapshot(const std::string& filename) {
 }
 
 void Application::clearSimulation() {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     bool wasPaused = simulationPaused_;
     if(!wasPaused) pauseSimulation();
 
@@ -641,7 +653,7 @@ void Application::clearSimulation() {
 }
 
 void Application::setSimulationSpeed(float updatesPerSecond) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (updatesPerSecond <= 0.0f) {
         simulationSpeed_ = 0.1f;
         if (logger) logger->info("Invalid speed. Setting to minimum {} UPS.", std::to_string(simulationSpeed_));
@@ -667,7 +679,7 @@ void Application::setSimulationSpeed(float updatesPerSecond) {
 }
 
 void Application::onWindowResized(int newWidth, int newHeight) {
-    auto logger = Logging::GetLogger(Logging::Module::Core);
+    auto logger = Logger::getLogger(Logger::Module::Core);
     if (newWidth > 0 && newHeight > 0) {
         viewport_.setScreenDimensions(newWidth, newHeight, cellSpace_);
         if (logger) logger->info("Window resized to {}x{}", std::to_string(newWidth), std::to_string(newHeight));

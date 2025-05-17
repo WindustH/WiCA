@@ -271,7 +271,7 @@ bool CommandParser::parseAndExecute(const std::string& commandString) {
         application_.quit();
         return true;
     }
-    auto logger = Logging::GetLogger(Logging::Module::CommandParser);
+    auto logger = Logger::getLogger(Logger::Module::CommandParser);
     if (logger) logger->error("Unknown command: " + commandString);
     application_.postMessageToUser("Unknown command: " + tokens[0] + ". Type 'help'.");
     return false;

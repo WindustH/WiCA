@@ -3,7 +3,7 @@
 #include "spdlog/sinks/basic_file_sink.h"   // For file sink
 #include <iostream> // For std::cerr in case of logging init failure
 
-namespace Logging {
+namespace Logger {
 
 // Static storage for loggers and sinks
 static std::unordered_map<Module, std::shared_ptr<spdlog::logger>> s_Loggers;
@@ -29,7 +29,7 @@ std::string ModuleToString(Module module) {
     }
 }
 
-void Init(const std::string& logFilePath, spdlog::level::level_enum globalLevel) {
+void initialize(const std::string& logFilePath, spdlog::level::level_enum globalLevel) {
     try {
         s_Sinks.clear();
         s_Loggers.clear();
@@ -65,7 +65,7 @@ void Init(const std::string& logFilePath, spdlog::level::level_enum globalLevel)
         spdlog::flush_on(spdlog::level::err);
 
         // Initial log message from the Main logger
-        auto main_logger = GetLogger(Module::Main);
+        auto main_logger = getLogger(Module::Main);
         if (main_logger) {
             main_logger->info("Logging system initialized. Log file: '{}'. Global level: {}", logFilePath, spdlog::level::to_string_view(globalLevel).data());
         } else {
@@ -80,7 +80,7 @@ void Init(const std::string& logFilePath, spdlog::level::level_enum globalLevel)
     }
 }
 
-std::shared_ptr<spdlog::logger> GetLogger(Module module) {
+std::shared_ptr<spdlog::logger> getLogger(Module module) {
     auto it = s_Loggers.find(module);
     if (it != s_Loggers.end()) {
         return it->second;
@@ -112,8 +112,8 @@ std::shared_ptr<spdlog::logger> GetLogger(Module module) {
     }
 }
 
-void SetLevel(Module module, spdlog::level::level_enum level) {
-    auto logger = GetLogger(module); // GetLogger now handles unknown modules better
+void setLevel(Module module, spdlog::level::level_enum level) {
+    auto logger = getLogger(module); // GetLogger now handles unknown modules better
     if (logger) {
         logger->set_level(level);
         // Log level change confirmation at info level, respecting the new level.
@@ -125,7 +125,7 @@ void SetLevel(Module module, spdlog::level::level_enum level) {
     }
 }
 
-void SetGlobalLevel(spdlog::level::level_enum level) {
+void setGlobalLevel(spdlog::level::level_enum level) {
     for (auto const& pair : s_Loggers) {
         if (pair.second) {
             pair.second->set_level(level);
@@ -133,7 +133,7 @@ void SetGlobalLevel(spdlog::level::level_enum level) {
     }
     // Use a known logger (e.g., Main) to announce the global change,
     // or iterate and log for each if verbose confirmation is desired.
-    auto main_logger = GetLogger(Module::Main);
+    auto main_logger = getLogger(Module::Main);
     if (main_logger) {
          main_logger->info("Global log level set to: {}", spdlog::level::to_string_view(level).data());
     } else {

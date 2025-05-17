@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Logging {
+namespace Logger {
 
 // Enum for different logger modules, can be expanded
 enum class Module {
@@ -34,27 +34,27 @@ enum class Module {
  * @param logFilePath Path to the output log file.
  * @param globalLevel Initial global log level for all loggers.
  */
-void Init(const std::string& logFilePath = "application.log", spdlog::level::level_enum globalLevel = spdlog::level::trace);
+void initialize(const std::string& logFilePath = "application.log", spdlog::level::level_enum globalLevel = spdlog::level::trace);
 
 /**
  * @brief Retrieves a logger for a specific module.
  * @param module The logger module.
  * @return A shared_ptr to the spdlog::logger, or nullptr if not found.
  */
-std::shared_ptr<spdlog::logger> GetLogger(Module module);
+std::shared_ptr<spdlog::logger> getLogger(Module module);
 
 /**
  * @brief Sets the logging level for a specific module.
  * @param module The logger module.
  * @param level The spdlog level to set.
  */
-void SetLevel(Module module, spdlog::level::level_enum level);
+void setLevel(Module module, spdlog::level::level_enum level);
 
 /**
  * @brief Sets the logging level for all registered loggers.
  * @param level The spdlog level to set globally.
  */
-void SetGlobalLevel(spdlog::level::level_enum level);
+void setGlobalLevel(spdlog::level::level_enum level);
 
 /**
  * @brief Converts a Module enum to its string representation (logger name).

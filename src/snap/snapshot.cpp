@@ -21,7 +21,7 @@ void SnapshotManager::writeInt32(std::vector<std::uint8_t>& buffer, std::int32_t
 
 // Helper to read a 32-bit integer from a byte vector (little-endian)
 std::int32_t SnapshotManager::readInt32(const std::vector<std::uint8_t>& buffer, size_t& offset) const {
-    auto logger = Logging::GetLogger(Logging::Module::Snapshot);
+    auto logger = Logger::getLogger(Logger::Module::Snapshot);
     if (offset + sizeof(std::int32_t) > buffer.size()) {
         if (logger) logger->error("ReadInt32 - Read out of bounds.");
         throw std::out_of_range("ReadInt32 out of bounds");
@@ -69,7 +69,7 @@ std::vector<std::uint8_t> SnapshotManager::serializeCellSpace(const CellSpace& c
  * @brief Deserializes data into CellSpace.
  */
 bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data, CellSpace& cellSpace) const {
-    auto logger = Logging::GetLogger(Logging::Module::Snapshot);
+    auto logger = Logger::getLogger(Logger::Module::Snapshot);
     cellSpace.clear();
 
     size_t offset = 0;
@@ -118,7 +118,7 @@ bool SnapshotManager::deserializeCellSpace(const std::vector<std::uint8_t>& data
  * @brief Saves the CellSpace state to a file.
  */
 bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& cellSpace) {
-    auto logger = Logging::GetLogger(Logging::Module::Snapshot);
+    auto logger = Logger::getLogger(Logger::Module::Snapshot);
     std::string actualFilePath = filePath;
     if (actualFilePath.length() < 10 || actualFilePath.substr(actualFilePath.length() - 9) != ".snapshot") {
         actualFilePath += ".snapshot";
@@ -157,7 +157,7 @@ bool SnapshotManager::saveState(const std::string& filePath, const CellSpace& ce
  * @brief Loads CellSpace state from a file.
  */
 bool SnapshotManager::loadState(const std::string& filePath, CellSpace& cellSpace) {
-    auto logger = Logging::GetLogger(Logging::Module::Snapshot);
+    auto logger = Logger::getLogger(Logger::Module::Snapshot);
     std::ifstream inFile(filePath, std::ios::binary | std::ios::ate);
     if (!inFile.is_open()) {
         if (logger) logger->error("Failed to open file for loading: " + filePath);

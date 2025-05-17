@@ -47,6 +47,8 @@ private:
     float simulationSpeed_;
     Uint32 timePerUpdate_;
     Uint32 simulationLag_;
+    Uint32 timePerFrame_;
+    Uint32 refreshLag_;
 
     int currentBrushState_;
     int currentBrushSize_;

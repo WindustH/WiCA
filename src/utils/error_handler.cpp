@@ -8,7 +8,7 @@ namespace ErrorHandler {
 
     void failure(const std::string& message) {
         // Get the dedicated logger for ErrorHandler messages
-        auto logger = Logging::GetLogger(Logging::Module::ErrorHandler);
+        auto logger = Logger::getLogger(Logger::Module::ErrorHandler);
 
         if (!logger) {
             // Fallback to std::cerr if logger is somehow unavailable (should not happen after Init)
