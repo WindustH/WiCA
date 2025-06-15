@@ -1,8 +1,8 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include <string>
 #include <vector>
 #include <unordered_map> // For stateSdlColorMap_
@@ -23,7 +23,7 @@ enum class GridDisplayMode {
 
 // Helper struct to store pre-calculated render information for each cell rectangle
 struct CellRenderInfo {
-    SDL_Rect rect;
+    SDL_FRect rect;
     SDL_Color color;
 };
 

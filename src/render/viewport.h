@@ -3,7 +3,7 @@
 
 #include "../utils/point.h"
 #include "../ca/cell_space.h" // Required for autoFit functionality
-#include <SDL.h>              // For SDL_Rect
+#include <SDL3/SDL.h>              // For SDL_Rect
 
 /**
  * @class Viewport

@@ -1,7 +1,7 @@
 #ifndef INPUT_HANDLER_H
 #define INPUT_HANDLER_H
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include "../utils/point.h"
 
 // Forward declarations of classes that InputHandler interacts with or calls methods on.

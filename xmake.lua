@@ -9,8 +9,21 @@ if is_plat("msvc") then
     add_cxflags("/W4")
 end
 
+add_rules("mode.debug", "mode.release")
+add_requires("nlohmann_json","tbb")
 
-add_requires("sdl2", "sdl2_image", "sdl2_ttf", "nlohmann_json", "spdlog", "fmt", "tbb")
+-- 可选：在特定模式下进行额外配置
+if is_mode("release") then
+    set_optimize("fastest") -- release 模式下通常会开启最高优化
+    set_strip("all")       -- release 模式下通常会剥离调试信息
+    add_defines("NDEBUG")  -- 定义 NDEBUG 宏，用于禁用 assert 等调试代码
+elseif is_mode("debug") then
+    set_symbols("debug")   -- debug 模式下生成调试符号
+    set_optimize("none")   -- debug 模式下通常不开启优化或只开启少量优化
+    add_defines("DEBUG")   -- 定义 DEBUG 宏
+end
+
+add_requires("sdl3", "sdl3_image", "sdl3_ttf", "nlohmann_json", "spdlog", "fmt", "tbb")
 
 target("WiCA")
     set_kind("binary")
@@ -31,7 +44,7 @@ target("WiCA")
         "src/utils/timer.cpp"
     )
     add_includedirs("src")
-    add_packages("sdl2", "sdl2_image", "sdl2_ttf", "nlohmann_json", "spdlog", "fmt", "tbb")
+    add_packages("sdl3", "sdl3_image", "sdl3_ttf", "nlohmann_json", "spdlog", "fmt", "tbb")
     after_build(function (target)
         print("Copying assets and rules to build directory...")
         os.cp("assets", target:targetdir())

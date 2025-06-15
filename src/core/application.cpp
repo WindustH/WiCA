@@ -1,6 +1,6 @@
 #include "application.h"
-#include <SDL_image.h>
-#include <SDL_ttf.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
 #include "../utils/logger.h" // New logger
 #include "../utils/error_handler.h"
 #include <algorithm>
@@ -49,22 +49,13 @@ Application::~Application() {
 bool Application::initializeSDL() {
     auto logger = Logger::getLogger(Logger::Module::Core);
 
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         ErrorHandler::failure("SDL_Init failed.");
         return false;
     }
 
-    int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
-    if (!(IMG_Init(imgFlags) & imgFlags)) {
-        if (logger) logger->error("IMG_Init failed to initialize all requested image formats. SDL_image Error: {}",std::string(IMG_GetError()));
-    } else {
-        if (logger) logger->info("SDL_image initialized successfully");
-    }
-
     window_ = SDL_CreateWindow(
         "SDL2 Cellular Automaton Simulator",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
         DEFAULT_SCREEN_WIDTH,
         DEFAULT_SCREEN_HEIGHT,
         SDL_WINDOW_RESIZABLE
@@ -154,14 +145,13 @@ bool Application::initializeSubsystems(const std::string& configPath) {
 void Application::cleanupSDL() {
     auto logger = Logger::getLogger(Logger::Module::Core);
     if (glContext_) {
-        SDL_GL_DeleteContext(glContext_);
+        SDL_GL_DestroyContext(glContext_);
         glContext_ = nullptr;
     }
     if (window_) {
         SDL_DestroyWindow(window_);
         window_ = nullptr;
     }
-    IMG_Quit();
     SDL_Quit();
     if (logger) logger->info("SDL cleaned up.");
 }
@@ -433,11 +423,11 @@ void Application::toggleCommandInput() {
     commandInputActive_ = !commandInputActive_;
     if (commandInputActive_) {
         commandInputBuffer_.clear();
-        SDL_StartTextInput();
+        SDL_StartTextInput(window_);
         if (logger) logger->info("Command input activated.");
         postMessageToUser("Command input ON. Press '/' or Esc to close.", 2000);
     } else {
-        SDL_StopTextInput();
+        SDL_StopTextInput(window_);
         if (logger) logger->info("Command input deactivated.");
     }
 }
