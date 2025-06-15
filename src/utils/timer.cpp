@@ -1,4 +1,4 @@
-#include "Timer.h"
+#include "timer.h"
 #include <iomanip>
 
 std::map<Timer::Module, std::chrono::duration<double, std::milli>> Timer::s_accumulatedTimes_;

@@ -119,15 +119,10 @@ set_target_properties(rgb_plugin PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${PLUGIN_OUTPUT_DIR}"
 )
 
-# On non-Windows platforms, ensure the library prefix is empty if you want "life.so"
-# instead of "liblife.so". This is often desired for plugins.
-if(NOT WIN32)
-    set_target_properties(life_plugin PROPERTIES PREFIX "")
-    # You might also want to ensure the correct suffix if not default .so/.dylib
-    # set_target_properties(life_plugin PROPERTIES SUFFIX ".plugin") # Example
-endif()
-
-
+set_target_properties(life_plugin PROPERTIES PREFIX "")
+set_target_properties(rgb_plugin PROPERTIES PREFIX "")
+set_target_properties(life_plugin PROPERTIES SUFFIX "")
+set_target_properties(rgb_plugin PROPERTIES SUFFIX "")
 # --- Copy Assets (for development build) ---
 # These commands copy assets to the build directory when the main executable is built.
 # For a proper installation, see the install() commands below.

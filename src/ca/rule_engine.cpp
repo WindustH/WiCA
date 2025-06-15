@@ -20,101 +20,62 @@ RuleEngine::~RuleEngine() {
 
 // --- DLL Handling Methods ---
 
-bool RuleEngine::loadRuleLibrary(const std::string& dllPathBaseFromConfig, const std::string& functionName) {
+bool RuleEngine::loadRuleLibrary(const std::string& dllPathFromConfig, const std::string& functionName) {
     auto logger = Logger::getLogger(Logger::Module::RuleEngine);
-    unloadRuleLibrary();
-    if (logger) logger->info("Start to load DLL.");
+    unloadRuleLibrary(); // Unload any previously loaded library first
 
-    if (dllPathBaseFromConfig.empty() || functionName.empty()) {
-        if (logger) logger->error("DLL path or function name is empty. Cannot load library.");
+    if (logger) logger->info("Attempting to load dynamic library...");
+
+    // Validate that the path and function name from the configuration are not empty.
+    if (dllPathFromConfig.empty() || functionName.empty()) {
+        if (logger) logger->error("Library path or function name is empty in configuration. Cannot load library.");
         return false;
     }
-
-    std::string actualDllPathLoaded;
 
 #ifdef _WIN32
-    std::string pathAttempt1 = dllPathBaseFromConfig + ".dll";
-    dllHandle_ = LoadLibraryA(pathAttempt1.c_str());
+    // On Windows, directly use the provided path to load the DLL.
+    dllHandle_ = LoadLibraryA(dllPathFromConfig.c_str());
 
     if (!dllHandle_) {
-        std::filesystem::path p(dllPathBaseFromConfig);
-        std::string dir = p.has_parent_path() ? p.parent_path().generic_string() : "";
-        std::string filename = p.filename().string();
-        std::string pathAttempt2;
-        if (!dir.empty()) {
-            pathAttempt2 = dir + "/lib" + filename + ".dll";
-        } else {
-            pathAttempt2 = "lib" + filename + ".dll";
-        }
-
-        dllHandle_ = LoadLibraryA(pathAttempt2.c_str());
-        if (dllHandle_) {
-            actualDllPathLoaded = pathAttempt2;
-        }
-    } else {
-        actualDllPathLoaded = pathAttempt1;
-    }
-
-    if (!dllHandle_) {
-        if (logger) logger->error("Failed to load DLL (both attempts). Last error code: " + std::to_string(GetLastError()));
+        if (logger) logger->error("Failed to load DLL '" + dllPathFromConfig + "'. Last error code: " + std::to_string(GetLastError()));
         return false;
     }
 
+    // Suppress warning about casting a function pointer type, which is a common practice here.
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wcast-function-type"
     dllRuleFunction_ = reinterpret_cast<RuleUpdateFunction>(GetProcAddress(dllHandle_, functionName.c_str()));
     #pragma GCC diagnostic pop
 
     if (!dllRuleFunction_) {
-        if (logger) logger->error("Failed to find function '" + functionName + "' in DLL '" + actualDllPathLoaded + "'. Error code: " + std::to_string(GetLastError()));
-        FreeLibrary(dllHandle_);
+        if (logger) logger->error("Failed to find function '" + functionName + "' in DLL '" + dllPathFromConfig + "'. Error code: " + std::to_string(GetLastError()));
+        FreeLibrary(dllHandle_); // Clean up by freeing the library if the function isn't found.
         dllHandle_ = nullptr;
         return false;
     }
 
 #else // POSIX (Linux, macOS)
-    std::filesystem::path p(dllPathBaseFromConfig);
-    std::string dir_str = p.has_parent_path() ? p.parent_path().generic_string() : "";
-    std::string filename_str = p.filename().string();
+    // On POSIX systems, directly use the provided path to load the shared library (.so, .dylib).
+    dllHandle_ = dlopen(dllPathFromConfig.c_str(), RTLD_LAZY);
 
-    std::string baseNameForPosix;
-    if (!dir_str.empty()) {
-        if (dir_str[0] == '/' || (dir_str.length() > 1 && dir_str[1] == ':')) { // Absolute path
-            baseNameForPosix = dir_str + "/lib" + filename_str;
-        } else { // Relative path
-            baseNameForPosix = "./" + dir_str + "/lib" + filename_str;
-        }
-    } else { // No directory part
-        baseNameForPosix = "./lib" + filename_str;
+    if (!dllHandle_) {
+        if (logger) logger->error("Failed to load shared library '" + dllPathFromConfig + "'. Error: " + dlerror());
+        return false;
     }
 
-    std::string soPath = baseNameForPosix + ".so";
-    dllHandle_ = dlopen(soPath.c_str(), RTLD_LAZY);
-    if (dllHandle_) {
-        actualDllPathLoaded = soPath;
-    } else {
-        std::string dylibPath = baseNameForPosix + ".dylib";
-        dllHandle_ = dlopen(dylibPath.c_str(), RTLD_LAZY);
-        if (dllHandle_) {
-            actualDllPathLoaded = dylibPath;
-        } else {
-             if (logger) logger->error("Failed to load .dylib '" + dylibPath + "': " + dlerror());
-             return false;
-        }
-    }
-
-    dlerror(); // Clear any existing error
+    dlerror(); // Clear any existing error before calling dlsym.
     dllRuleFunction_ = (RuleUpdateFunction)dlsym(dllHandle_, functionName.c_str());
+
     const char* dlsym_error = dlerror();
     if (dlsym_error) {
-        if (logger) logger->error("Failed to find function '" + functionName + "' in library '" + actualDllPathLoaded + "': " + dlsym_error);
-        dlclose(dllHandle_);
+        if (logger) logger->error("Failed to find function '" + functionName + "' in library '" + dllPathFromConfig + "'. Error: " + dlsym_error);
+        dlclose(dllHandle_); // Clean up by closing the handle if the function isn't found.
         dllHandle_ = nullptr;
         return false;
     }
 #endif
 
-    if (logger) logger->info("DLL loaded.");
+    if (logger) logger->info("Successfully loaded library '" + dllPathFromConfig + "' and found function '" + functionName + "'.");
     return true;
 }
 
